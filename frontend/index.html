@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <!-- Configurações básicas de codificação e título da janela -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cornhole Inteligente - IFEx</title>
+    
+    <!-- Folha de Estilos Neon Cyberpunk Retrô -->
+    <link rel="stylesheet" href="/style.css?v=20261021_04">
+</head>
+<body>
+
+    <!-- =======================================================================
+         1. CABEÇALHO SUPERIOR (HEADER)
+         Exibe a logo oficial do evento, o status da conexão em tempo real
+         e os botões para controlar som e chamar o painel do operador.
+         ======================================================================= -->
+    <header>
+        <!-- Logo e Edição do Evento -->
+        <div class="logo-arcade">
+            <div class="logo-badge">IFEx</div>
+            <div class="logo-text">
+                <h1>CORNHOLE INTELIGENTE</h1>
+                <span>EDIÇÃO 2026 • TEMPO REAL</span>
+            </div>
+        </div>
+
+        <!-- Indicador de Status WebSocket e Botões do Operador -->
+        <div class="header-status">
+            <div class="connection-badge">
+                <div class="connection-dot" id="wsDot"></div>
+                <span id="wsStatus">CONECTANDO...</span>
+            </div>
+            <!-- Botão para ligar/desligar os efeitos sonoros 8-bit -->
+            <button class="btn-operator" id="btnAudioToggle" title="Ativar/Mudo Sons">🔊 SOM: ON</button>
+            <!-- Botão para abrir o modal de cadastro (ou tecla [O]) -->
+            <button class="btn-operator" id="btnOpenOperator">⚙️ PAINEL DO OPERADOR [O]</button>
+        </div>
+    </header>
+
+    <!-- =======================================================================
+         2. ÁREA PRINCIPAL DO FLIPERAMA (MAIN)
+         Dividida em duas colunas:
+         - Esquerda: Arena do Jogo (Jogador da vez, Cronômetro e Pontuação)
+         - Direita: Hall da Fama (Ranking Top 10 com desempate por tempo)
+         ======================================================================= -->
+    <main>
+        <!-- --- LADO ESQUERDO: ARENA DO JOGO --- -->
+        <section class="game-arena">
+            
+            <!-- Card com o nome e a turma do competidor que está arremessando -->
+            <div class="player-card">
+                <div>
+                    <div class="player-info-label">JOGADOR DA VEZ</div>
+                    <div class="player-name" id="playerName">Aguardando Seleção...</div>
+                </div>
+                <div class="player-tag" id="playerTag">---</div>
+            </div>
+
+            <!-- Mostradores Gigantes em Display Neon -->
+            <div class="display-grid">
+                <!-- Caixa do Cronômetro de Precisão (atualizado a 60 FPS) -->
+                <div class="display-box timer-box">
+                    <div class="display-label">CRONÔMETRO DE PRECISÃO</div>
+                    <div class="timer-value" id="displayTimer">00:00.000</div>
+                </div>
+
+                <!-- Caixa da Pontuação da Rodada -->
+                <div class="display-box score-box">
+                    <div class="display-label">PONTUAÇÃO DA RODADA</div>
+                    <div class="score-value" id="displayScore">00</div>
+                </div>
+            </div>
+
+            <!-- HUD Compacto com os 5 Saquinhos / Arremessos da Rodada -->
+            <div class="hud-ammo-bar">
+                <div class="hud-ammo-header">
+                    <span>ARREMESSOS DA RODADA</span>
+                    <span class="hud-ammo-counter" id="ammoCountLabel">0 / 5 LANÇADOS</span>
+                </div>
+                <div class="hud-pills-row" id="bagsContainer">
+                    <div class="hud-pill" id="bagSlot1">
+                        <span class="bag-icon">⚪</span>
+                        <span class="bag-status">SACO 1</span>
+                    </div>
+                    <div class="hud-pill" id="bagSlot2">
+                        <span class="bag-icon">⚪</span>
+                        <span class="bag-status">SACO 2</span>
+                    </div>
+                    <div class="hud-pill" id="bagSlot3">
+                        <span class="bag-icon">⚪</span>
+                        <span class="bag-status">SACO 3</span>
+                    </div>
+                    <div class="hud-pill" id="bagSlot4">
+                        <span class="bag-icon">⚪</span>
+                        <span class="bag-status">SACO 4</span>
+                    </div>
+                    <div class="hud-pill" id="bagSlot5">
+                        <span class="bag-icon">⚪</span>
+                        <span class="bag-status">SACO 5</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Banner com Instruções Claras para o Competidor -->
+            <div class="action-banner" id="actionBanner">
+                <h2 id="bannerTitle">ESCOLHA O JOGADOR</h2>
+                <p id="bannerSubtitle">Pressione [O] para abrir o painel e cadastrar o competidor da vez.</p>
+            </div>
+
+        </section>
+
+        <!-- --- LADO DIREITO: RANKING COM SELEÇÃO GERAL / TURMA --- -->
+        <section class="ranking-section">
+            <div class="ranking-header">
+                <div>
+                    <h2 class="ranking-title" id="rankingHeaderTitle">🏆 RANKING GLOBAL IFEx</h2>
+                </div>
+                <!-- Barra de Filtros: Placar Geral vs Placar por Turma/Grupo -->
+                <div class="ranking-filter-bar">
+                    <button class="tab-filter-btn active" id="btnFilterGeral">🌐 GERAL</button>
+                    <select class="select-group-filter" id="selectGroupFilter">
+                        <option value="">👥 TODAS AS TURMAS ▾</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabela com os melhores competidores -->
+            <div class="ranking-table-container">
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th>POS</th>
+                            <th>JOGADOR</th>
+                            <th>TURMA</th>
+                            <th>PONTOS</th>
+                            <th>TEMPO</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankingTableBody">
+                        <!-- Linhas geradas automaticamente pelo JavaScript via PostgreSQL -->
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                                Carregando ranking do PostgreSQL...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- =======================================================================
+         3. RODAPÉ (FOOTER)
+         Atalhos e botões de teste discretos no rodapé
+         ======================================================================= -->
+    <footer>
+        <div class="shortcuts-hint">
+            <strong>ATALHOS:</strong> [ESPAÇO] Iniciar e Finalizar Rodada &nbsp;|&nbsp; [O] Painel do Operador &nbsp;|&nbsp; [R] Resetar Tela
+        </div>
+        <!-- Botões de Simulação (apenas no rodapé, como o usuário prefere) -->
+        <div class="sim-buttons">
+            <button class="btn-sim sim-hole" id="btnSimHole">BURACO (+3) [B]</button>
+            <button class="btn-sim sim-board" id="btnSimBoard">PRANCHA (+1) [P]</button>
+            <button class="btn-sim sim-miss" id="btnSimMiss">FORA (0) [F]</button>
+            <button class="btn-sim" id="btnSimReset">RESET [R]</button>
+        </div>
+    </footer>
+
+    <!-- Elemento Flutuante para Popups Neon de Pontuação (+3 BURACO! / +1 PRANCHA!) -->
+    <div class="score-popup" id="scorePopup">+3 BURACO!</div>
+
+    <!-- =======================================================================
+         4. MODAL DO OPERADOR (CADASTRO E FILA DE JOGADORES)
+         Fica oculto por padrão e abre ao pressionar a tecla [O] ou clicar no botão
+         ======================================================================= -->
+    <div class="modal-overlay" id="operatorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">🎮 CADASTRO DO COMPETIDOR</h3>
+                <button class="btn-close-modal" id="btnCloseModal">&times;</button>
+            </div>
+
+            <!-- Formulário para cadastrar um novo competidor -->
+            <div class="form-group">
+                <label for="inputNome">NOME DO COMPETIDOR:</label>
+                <input type="text" id="inputNome" class="form-input" placeholder="Ex: Felipe Amorim" autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="inputApelido">TURMA / CURSO (OU APELIDO):</label>
+                <input type="text" id="inputApelido" class="form-input" placeholder="Ex: Info-3B ou Meca-2A">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <button class="btn-submit" id="btnCadastrarNovo" style="flex: 1;">
+                    ⚡ JOGAR AGORA [ENTER]
+                </button>
+                <button class="btn-submit" id="btnAdicionarFila" style="flex: 1; background: rgba(255, 230, 0, 0.15); border: 1px solid var(--neon-yellow); color: var(--neon-yellow);">
+                    ➕ SÓ ADICIONAR À FILA
+                </button>
+            </div>
+
+            <!-- Feedback visual de cadastro (mensagem verde/amarela ao cadastrar) -->
+            <div id="modalFeedback" style="display: none; margin-top: 12px; padding: 10px; border-radius: 6px; font-size: 13px; text-align: center; font-weight: bold;"></div>
+
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
+
+            <!-- Seleção rápida de competidor que já jogou antes ou está na fila -->
+            <div class="form-group">
+                <label for="selectJogador" id="labelSelectJogador">OU SELECIONE ALGUÉM DA FILA:</label>
+                <select id="selectJogador" class="form-select">
+                    <option value="">-- Carregando competidores da fila... --</option>
+                </select>
+                <button class="btn-submit" id="btnSelectExisting" style="margin-top: 8px; background: rgba(0, 240, 255, 0.2); border: 1px solid var(--neon-cyan);">
+                    SELECIONAR DA FILA
+                </button>
+            </div>
+
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
+
+            <!-- Zona de Segurança de Dados, Backups e Reset com Senha -->
+            <div class="data-security-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: bold; color: var(--neon-cyan); letter-spacing: 1px;">
+                        🛡️ SEGURANÇA E BACKUPS
+                    </span>
+                    <span style="font-size: 0.7rem; color: var(--text-dim);" id="backupNoticeLabel">
+                        Auto-salvamento ativo
+                    </span>
+                </div>
+
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn-sec" id="btnSalvarBackup" style="flex: 1; min-width: 130px; background: rgba(0, 240, 255, 0.15); border: 1px solid var(--neon-cyan); color: var(--neon-cyan);">
+                        💾 SALVAR BACKUP
+                    </button>
+                    <button class="btn-sec" id="btnRestaurarBackup" style="flex: 1; min-width: 130px; background: rgba(255, 230, 0, 0.15); border: 1px solid var(--neon-yellow); color: var(--neon-yellow);">
+                        📥 RESTAURAR
+                    </button>
+                    <button class="btn-sec" id="btnExportarCsv" style="flex: 1; min-width: 130px; background: rgba(157, 0, 255, 0.15); border: 1px solid var(--neon-purple); color: #fff;">
+                        📊 EXPORTAR CSV
+                    </button>
+                </div>
+
+                <!-- Zona de Perigo: Zerar Banco com Senha 'admin' -->
+                <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255, 0, 85, 0.3); display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <span style="font-size: 0.75rem; color: var(--text-dim);">Novo Torneio:</span>
+                    <button class="btn-sec" id="btnZerarBanco" style="background: rgba(255, 0, 85, 0.2); border: 1px solid var(--neon-red); color: var(--neon-red); font-size: 0.75rem; padding: 6px 12px;">
+                        🗑️ ZERAR BANCO (SENHA)
+                    </button>
+                </div>
+
+                <!-- Feedback de operações de segurança -->
+                <div id="securityFeedback" style="display: none; margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 12px; text-align: center; font-weight: bold;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         5. IMPORTAÇÃO DOS SCRIPTS JAVASCRIPT
+         - audio.js: sintetizador Web Audio API de 8-bit
+         - app.js: motor de conexão WebSocket, cronômetro e atalhos de teclado
+         ======================================================================= -->
+    <script src="/audio.js?v=20261021_04"></script>
+    <script src="/app.js?v=20261021_04"></script>
+</body>
+</html>

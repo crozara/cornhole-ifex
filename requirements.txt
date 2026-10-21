@@ -1,0 +1,10 @@
+# =============================================================================
+# CORNHOLE INTELIGENTE - IFEx 2026
+# Dependências do Projeto (Python 3.10+)
+# =============================================================================
+
+# Comunicação em tempo real entre o backend Python e o dashboard web (60 FPS)
+websockets>=10.4
+
+# Leitura e envio de comandos para a placa Arduino via USB/Serial
+pyserial>=3.5

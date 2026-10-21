@@ -1,0 +1,56 @@
+# =============================================================================
+# CORNHOLE INTELIGENTE - IFEx 2026
+# Arquivo: .gitignore
+# =============================================================================
+
+# 1. Banco de Dados Local (PostgreSQL)
+# NUNCA comitar arquivos binários de dados nem sockets locais de comunicação
+.pgdata/
+.pgrun/
+*.pid
+
+# 2. Backups de Segurança e Dumps Locais
+# Mantém a pasta 'backups/' versionada mas ignora arquivos .sql gerados durante jogos/testes
+backups/*.sql
+!backups/.gitkeep
+
+# 3. Planilhas CSV geradas em tempo de execução
+ranking.csv
+historico_partidas.csv
+
+# 4. Arquivos Temporários do Python e Ambientes Virtuais
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+env/
+ENV/
+
+# 5. Configurações de IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 6. Logs do Sistema
+*.log

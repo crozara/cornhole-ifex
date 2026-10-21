@@ -1,0 +1,866 @@
+/* ==========================================================================
+   ESTILO RETRO ARCADE - CORNHOLE CHAMPIONSHIP IFEx
+   ========================================================================== */
+
+:root {
+    --bg-dark: #0a0b10;
+    --bg-card: rgba(18, 22, 34, 0.85);
+    --border-card: rgba(0, 240, 255, 0.25);
+    --neon-cyan: #00f0ff;
+    --neon-pink: #ff0055;
+    --neon-yellow: #ffe600;
+    --neon-green: #00ff66;
+    --neon-purple: #9d00ff;
+    --text-primary: #ffffff;
+    --text-dim: #8b9bb4;
+    --font-arcade: 'Courier New', 'Consolas', monospace;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: var(--font-arcade);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    position: relative;
+    background-image: 
+        radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(255, 0, 85, 0.06) 0%, transparent 50%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+}
+
+/* Efeito Scanlines sutis de monitor CRT de fliperama */
+body::after {
+    content: " ";
+    display: block;
+    position: fixed;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+    background-size: 100% 4px;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* --------------------------------------------------------------------------
+   CABEÇALHO
+   -------------------------------------------------------------------------- */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 30px;
+    background: rgba(10, 12, 18, 0.9);
+    border-bottom: 2px solid var(--neon-cyan);
+    box-shadow: 0 4px 20px rgba(0, 240, 255, 0.15);
+}
+
+.logo-arcade {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-badge {
+    background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple));
+    color: #fff;
+    font-weight: 900;
+    font-size: 1.1rem;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+    letter-spacing: 2px;
+}
+
+.logo-text h1 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: 3px;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.logo-text span {
+    font-size: 0.75rem;
+    color: var(--neon-yellow);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.header-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.connection-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.connection-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #555;
+}
+
+.connection-dot.online {
+    background: var(--neon-green);
+    box-shadow: 0 0 10px var(--neon-green);
+}
+
+.btn-operator {
+    background: transparent;
+    color: var(--neon-cyan);
+    border: 1px solid var(--neon-cyan);
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-operator:hover {
+    background: var(--neon-cyan);
+    color: #000;
+    box-shadow: 0 0 15px var(--neon-cyan);
+}
+
+/* --------------------------------------------------------------------------
+   LAYOUT PRINCIPAL
+   -------------------------------------------------------------------------- */
+main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 25px;
+    padding: 25px 30px;
+    max-width: 1600px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   ARENA DO JOGO (LADO ESQUERDO)
+   -------------------------------------------------------------------------- */
+.game-arena {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.player-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.player-info-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.player-name {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.player-tag {
+    font-size: 1rem;
+    color: var(--neon-yellow);
+    background: rgba(255, 230, 0, 0.1);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 230, 0, 0.3);
+}
+
+/* DISPLAY CENTRAL: CRONÔMETRO + PLACAR GIGANTES */
+.display-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.display-box {
+    background: var(--bg-card);
+    border: 2px solid var(--border-card);
+    border-radius: 12px;
+    padding: 38px 20px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+}
+
+.display-box.timer-box {
+    border-color: var(--neon-green);
+    box-shadow: 0 0 30px rgba(0, 255, 102, 0.2);
+}
+
+.display-box.score-box {
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 30px rgba(255, 0, 85, 0.2);
+}
+
+.display-label {
+    font-size: 0.9rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
+.timer-value {
+    font-size: 4rem;
+    font-weight: 900;
+    color: var(--neon-green);
+    text-shadow: 0 0 18px var(--neon-green);
+    letter-spacing: 2px;
+}
+
+.score-value {
+    font-size: 5.2rem;
+    font-weight: 900;
+    color: var(--neon-pink);
+    text-shadow: 0 0 25px var(--neon-pink);
+    line-height: 1;
+}
+
+/* HUD COMPACTO DOS 5 SAQUINHOS (INDICADOR ELEGANTE) */
+.hud-ammo-bar {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hud-ammo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+.hud-ammo-counter {
+    font-weight: bold;
+    color: var(--neon-cyan);
+}
+
+.hud-pills-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+}
+
+.hud-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 8px 6px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.hud-pill.active {
+    border-color: var(--neon-yellow);
+    color: #fff;
+    background: rgba(255, 230, 0, 0.12);
+    box-shadow: 0 0 12px rgba(255, 230, 0, 0.3);
+    animation: pulseHudPill 1.2s infinite;
+}
+
+@keyframes pulseHudPill {
+    0%, 100% { border-color: var(--neon-yellow); }
+    50% { border-color: var(--neon-cyan); }
+}
+
+.hud-pill.scored-hole {
+    border-color: var(--neon-pink);
+    background: rgba(255, 0, 85, 0.2);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(255, 0, 85, 0.4);
+}
+
+.hud-pill.scored-board {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.2);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+}
+
+.hud-pill.scored-miss {
+    border-color: #555;
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+}
+
+/* PAINEL DE CONTROLES ARCADE (DECK DE BOTÕES TÁTEIS) */
+.arcade-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.arcade-btn {
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    cursor: pointer;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.5);
+    position: relative;
+    user-select: none;
+}
+
+.arcade-btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Botão Principal de Iniciar / Parar */
+.btn-main-space {
+    background: linear-gradient(135deg, #00ff66, #00aa44);
+    color: #05140b;
+    padding: 16px 24px;
+    font-size: 1.15rem;
+    letter-spacing: 2px;
+    border: 2px solid #00ff66;
+    box-shadow: 0 0 20px rgba(0, 255, 102, 0.4), 0 5px 0 #006622;
+    width: 100%;
+}
+
+.btn-main-space:hover {
+    box-shadow: 0 0 30px rgba(0, 255, 102, 0.6), 0 5px 0 #006622;
+    filter: brightness(1.1);
+}
+
+.btn-main-space:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 10px rgba(0, 255, 102, 0.4), 0 1px 0 #006622;
+}
+
+.btn-main-space.running {
+    background: linear-gradient(135deg, #ff0055, #cc0044);
+    color: #fff;
+    border-color: #ff0055;
+    box-shadow: 0 0 20px rgba(255, 0, 85, 0.4), 0 5px 0 #990033;
+}
+
+.btn-main-space.finished {
+    background: linear-gradient(135deg, #ffe600, #cca300);
+    color: #1a1500;
+    border-color: #ffe600;
+    box-shadow: 0 0 20px rgba(255, 230, 0, 0.4), 0 5px 0 #806600;
+}
+
+.btn-key-hint {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+}
+
+/* Linha de Botões de Simulação de Arremessos */
+.arcade-sim-group {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.5fr 1fr;
+    gap: 10px;
+}
+
+.btn-hit-hole {
+    background: rgba(255, 0, 85, 0.15);
+    border: 1.5px solid var(--neon-pink);
+    color: var(--neon-pink);
+    padding: 12px 10px;
+    font-size: 0.9rem;
+    box-shadow: 0 0 12px rgba(255, 0, 85, 0.2), 0 3px 0 rgba(255, 0, 85, 0.4);
+}
+.btn-hit-hole:hover {
+    background: var(--neon-pink);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(255, 0, 85, 0.5), 0 3px 0 rgba(150, 0, 50, 0.8);
+}
+
+.btn-hit-board {
+    background: rgba(0, 240, 255, 0.15);
+    border: 1.5px solid var(--neon-cyan);
+    color: var(--neon-cyan);
+    padding: 12px 10px;
+    font-size: 0.9rem;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.2), 0 3px 0 rgba(0, 240, 255, 0.4);
+}
+.btn-hit-board:hover {
+    background: var(--neon-cyan);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.5), 0 3px 0 rgba(0, 150, 180, 0.8);
+}
+
+.btn-hit-miss {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1.5px solid #666;
+    color: #bbb;
+    padding: 12px 10px;
+    font-size: 0.85rem;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+}
+.btn-hit-miss:hover {
+    background: #666;
+    color: #fff;
+}
+
+.btn-hit-reset {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    padding: 12px 10px;
+    font-size: 0.85rem;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+}
+.btn-hit-reset:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+/* BANNER DE AÇÃO DO FLIPERAMA */
+.action-banner {
+    background: linear-gradient(90deg, rgba(255, 0, 85, 0.2), rgba(0, 240, 255, 0.2));
+    border: 2px solid var(--neon-yellow);
+    border-radius: 8px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(255, 230, 0, 0.2);
+    animation: bannerPulse 2s infinite ease-in-out;
+}
+
+.action-banner h2 {
+    font-size: 1.4rem;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 10px var(--neon-yellow);
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+}
+
+.action-banner p {
+    font-size: 0.85rem;
+    color: #fff;
+    letter-spacing: 1px;
+}
+
+@keyframes bannerPulse {
+    0%, 100% { border-color: var(--neon-yellow); box-shadow: 0 0 15px rgba(255, 230, 0, 0.2); }
+    50% { border-color: var(--neon-cyan); box-shadow: 0 0 25px rgba(0, 240, 255, 0.4); }
+}
+
+/* --------------------------------------------------------------------------
+   RANKING GLOBAL IFEx (LADO DIREITO)
+   -------------------------------------------------------------------------- */
+.ranking-section {
+    background: var(--bg-card);
+    border: 2px solid var(--neon-purple);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(157, 0, 255, 0.15);
+}
+
+.ranking-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    border-bottom: 1px solid rgba(157, 0, 255, 0.3);
+    padding-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.ranking-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tab-filter-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+}
+
+.tab-filter-btn:hover {
+    border-color: var(--neon-yellow);
+    color: #fff;
+}
+
+.tab-filter-btn.active {
+    background: rgba(255, 230, 0, 0.18);
+    border-color: var(--neon-yellow);
+    color: var(--neon-yellow);
+    box-shadow: 0 0 12px rgba(255, 230, 0, 0.3);
+}
+
+.select-group-filter {
+    background: #141926;
+    border: 1px solid var(--neon-purple);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.select-group-filter:focus, .select-group-filter:hover {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+.ranking-title {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 10px rgba(255, 230, 0, 0.4);
+}
+
+.ranking-tiebreaker-notice {
+    font-size: 0.7rem;
+    color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+}
+
+.ranking-table-container {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.ranking-table th {
+    text-align: left;
+    padding: 10px 8px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ranking-table td {
+    padding: 12px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ranking-row-top1 {
+    background: rgba(255, 230, 0, 0.08);
+    font-weight: bold;
+}
+.ranking-row-top1 td:first-child {
+    color: var(--neon-yellow);
+}
+
+.ranking-row-top2 {
+    background: rgba(0, 240, 255, 0.05);
+}
+.ranking-row-top2 td:first-child {
+    color: var(--neon-cyan);
+}
+
+.ranking-row-top3 {
+    background: rgba(255, 0, 85, 0.05);
+}
+.ranking-row-top3 td:first-child {
+    color: var(--neon-pink);
+}
+
+.pos-badge {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.col-points {
+    color: var(--neon-pink);
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.col-time {
+    color: var(--neon-green);
+    font-family: var(--font-arcade);
+    font-weight: bold;
+}
+
+/* --------------------------------------------------------------------------
+   BARRA DE SIMULAÇÃO & ATALHOS (RODAPÉ)
+   -------------------------------------------------------------------------- */
+footer {
+    background: rgba(10, 12, 18, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.sim-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-sim {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sim:hover {
+    background: var(--neon-cyan);
+    color: #000;
+}
+
+.btn-sim.sim-hole { border-color: var(--neon-pink); color: var(--neon-pink); }
+.btn-sim.sim-hole:hover { background: var(--neon-pink); color: #fff; }
+
+.btn-sim.sim-board { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.btn-sim.sim-board:hover { background: var(--neon-cyan); color: #000; }
+
+.btn-sim.sim-miss { border-color: #888; color: #888; }
+.btn-sim.sim-miss:hover { background: #888; color: #000; }
+
+/* --------------------------------------------------------------------------
+   MODAL DO OPERADOR
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    z-index: 200;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: #121622;
+    border: 2px solid var(--neon-cyan);
+    border-radius: 12px;
+    padding: 30px;
+    width: 90%;
+    max-width: 520px;
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.3);
+    padding-bottom: 10px;
+}
+
+.modal-title {
+    color: var(--neon-cyan);
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+}
+
+.btn-close-modal {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.form-input, .form-select {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+.btn-submit {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-weight: bold;
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 10px;
+    transition: all 0.2s;
+}
+
+.btn-submit:hover {
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+}
+
+/* POPUP FLUTUANTE DE PONTOS (+3 / +1) */
+.score-popup {
+    position: fixed;
+    top: 40%;
+    left: 35%;
+    transform: translate(-50%, -50%);
+    font-size: 3.5rem;
+    font-weight: 900;
+    pointer-events: none;
+    z-index: 300;
+    opacity: 0;
+    text-shadow: 0 0 20px currentColor;
+}
+
+.score-popup.animate-popup {
+    animation: floatUp 1.2s forwards ease-out;
+}
+
+@keyframes floatUp {
+    0% { opacity: 0; transform: translate(-50%, -20%) scale(0.6); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+    80% { opacity: 1; transform: translate(-50%, -80%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -120%) scale(0.8); }
+}
+
+/* --------------------------------------------------------------------------
+   ZONA DE SEGURANÇA E BACKUPS NO MODAL
+   -------------------------------------------------------------------------- */
+.data-security-box {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.btn-sec {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    outline: none;
+}
+
+.btn-sec:hover {
+    filter: brightness(1.25);
+    box-shadow: 0 0 12px currentColor;
+    transform: translateY(-1px);
+}
+
+.btn-sec:active {
+    transform: translateY(1px);
+}
+
