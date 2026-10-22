@@ -36,6 +36,33 @@ O projeto integra **hardware**, **comunicação serial**, **banco de dados relac
 
 ---
 
+## 🤖 Hardware e Firmware (Arduino)
+
+O arquivo `arduino/main.ino` é responsável por monitorar os sensores físicos da prancha em tempo real e enviar os eventos de pontuação para o computador via porta Serial USB (`115200 bps`).
+
+### 1. Sensores e Mapeamento de Pinos
+
+| Alvo / Buraco | Sensor Utilizado | Pinos no Arduino | Limiar de Detecção | Pontuação |
+| :--- | :--- | :--- | :--- | :---: |
+| **Buraco Pequeno** | Laser ToF `VL53L0X` | Barramento `I2C` (`SDA` / `SCL`) | `< 100 mm` (`LIMIAR_LASER_MM`) | `50 pts` |
+| **Buraco Médio** | Ultrassônico `HC-SR04` | `TRIGGER`: Pino `5` / `ECHO`: Pino `6` | `< 15 cm` (`LIMIAR_SONAR_CM`) | `30 pts` |
+| **Buraco Grande** | Célula de Carga `HX711` | `DOUT`: Pino `3` / `SCK`: Pino `2` | `> 100.0 g` (`LIMIAR_PESO_G`) | `10 pts` |
+
+* **Bibliotecas necessárias na Arduino IDE:** `Wire.h`, `Adafruit_VL53L0X`, `NewPing`, `HX711` e `ArduinoJson` (v7).
+
+### 2. Controle de Status e Tempo de Retirada (`tempoDeEspera`)
+
+Como no Cornhole o saquinho pode permanecer sobre o sensor ou exigir que o jogador coloque a mão para retirá-lo, o firmware implementa uma máquina de estados com um tempo de retirada configurável (`tempoDeEspera = 3.0` segundos):
+
+* **`LIVRE`:** Estado inicial em que nenhum sensor detecta objetos e o tempo de espera já expirou. Assim que qualquer sensor detecta um saquinho, o ponto correspondente é computado **uma única vez**, enviado via Serial em JSON (`{"evento":"acerto","buraco":"...","pontos":...}`) e o status muda imediatamente para **`DETECTADO`**.
+* **`DETECTADO`:** Enquanto o saquinho (ou a mão do jogador) permanecer na área de leitura de qualquer sensor, o sistema mantém o status **`DETECTADO`** e bloqueia novas pontuações.
+* **`ESPERANDO`:** No exato momento em que o objeto é retirado (todos os sensores livres), o sistema entra no status **`ESPERANDO`** e inicia a contagem regressiva de `tempoDeEspera` segundos (`3.0s`).
+  * Durante **`ESPERANDO`**, **nenhum ponto é computado**.
+  * Caso qualquer objeto seja detectado novamente enquanto estiver em **`ESPERANDO`** (por exemplo, o jogador esbarrando no sensor ao puxar o saquinho), **nenhum ponto é marcado**, o status retorna para **`DETECTADO`** e, quando o objeto for retirado outra vez, o tempo de espera é **reiniciado em 100%** (terá que aguardar os `3.0` segundos completos novamente).
+  * Após transcorrerem os `tempoDeEspera` segundos ininterruptos sem detecções, o sistema retorna ao status **`LIVRE`** para o próximo lançamento.
+
+---
+
 ## 🗄️ A Engenharia de Banco de Dados (PostgreSQL 16)
 
 Como parte dos estudos avançados de banco de dados, as regras de negócio foram implementadas nativamente no PostgreSQL:
@@ -137,6 +164,8 @@ Você não precisa abrir a web para auditar ou ver os resultados:
 
 ```text
 ifex/
+├── arduino/
+│   └── main.ino            # Firmware do Arduino (leitura de sensores e tempo de retirada)
 ├── backend/
 │   ├── game_manager.py     # Máquina de estados, cronômetro de precisão e pontuação
 │   ├── serial_handler.py   # Leitura serial do Arduino (USB) e modo simulador
@@ -161,9 +190,10 @@ ifex/
 
 ## 🛠️ Tecnologias Utilizadas
 
+* **Hardware & Firmware:** Arduino (C/C++), Sensores `VL53L0X` (Laser I2C), `HC-SR04` (Ultrassônico) e `HX711` (Célula de Carga)
 * **Linguagem Back-end:** Python 3.12
 * **Tempo Real:** WebSockets (protocolo `ws://`)
 * **Banco de Dados:** PostgreSQL 16
-* **Comunicação de Hardware:** PySerial / Porta Serial USB
+* **Comunicação de Hardware:** PySerial / Porta Serial USB (`115200 bps`)
 * **Front-end:** HTML5, CSS3 Moderno, JavaScript ES6+
 * **Áudio:** Web Audio API (Sintetizador 8-bit nativo)

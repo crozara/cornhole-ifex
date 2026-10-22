@@ -26,12 +26,12 @@ const int LIMIAR_LASER_MM   = 100; // Dispara se algo passar a menos de 100mm
 const int LIMIAR_SONAR_CM   = 15;  // Dispara se algo passar a menos de 15cm
 const float LIMIAR_PESO_G   = 100.0; // Peso mínimo para registrar (sacos costumam ter ~400g)
 
-// --- Variáveis de Controle (Debounce/Cooldown) ---
-// Evita que a mesma sacola registre vários pontos enquanto atravessa o buraco
-const unsigned long TEMPO_COOLDOWN_MS = 2000; // 2 segundos de intervalo por buraco
-unsigned long ultimoAcertoPequeno = 0;
-unsigned long ultimoAcertoMedio   = 0;
-unsigned long ultimoAcertoGrande  = 0;
+// --- Variáveis de Controle (Debounce/Cooldown e Tempo de Retirada) ---
+// Evita que a mesma sacola registre vários pontos enquanto atravessa o buraco ou é retirada
+float tempoDeEspera = 3.0;          // Tempo de espera em segundos após retirar o objeto
+String status = "LIVRE";            // Estados do sistema: "LIVRE", "DETECTADO", "ESPERANDO"
+unsigned long inicioEspera = 0;     // Marca o momento (em ms) em que o objeto foi retirado
+float pesoAtual = 0.0;              // Mantém a última leitura válida da célula de carga
 
 void setup() {
   // Baud rate alto para minimizar atraso na comunicação serial
@@ -61,48 +61,59 @@ void loop() {
   // --- LEITURA BURACO PEQUENO (VL53L0X) ---
   VL53L0X_RangingMeasurementData_t measure;
   lox.rangingTest(&measure, false);
-  
   // Se o status for diferente de 4 (Out of Range) e a distância cruzar o limiar
-  if (measure.RangeStatus != 4 && measure.RangeMilliMeter < LIMIAR_LASER_MM) {
-    if (tempoAtual - ultimoAcertoPequeno > TEMPO_COOLDOWN_MS) {
-      buraco = "pequeno";
-      pontuacao = 50;
-      ultimoAcertoPequeno = tempoAtual;
-      pontoMarcado = true;
-    }
-  }
+  bool detectouPequeno = (measure.RangeStatus != 4 && measure.RangeMilliMeter < LIMIAR_LASER_MM);
 
   // --- LEITURA BURACO MÉDIO (Ultrassônico) ---
-  if (!pontoMarcado) { // Evita sobreposição no mesmo ciclo
-    int distanciaCm = sonar.ping_cm();
-    if (distanciaCm > 0 && distanciaCm < LIMIAR_SONAR_CM) {
-      if (tempoAtual - ultimoAcertoMedio > TEMPO_COOLDOWN_MS) {
-        buraco = "medio";
-        pontuacao = 30;
-        ultimoAcertoMedio = tempoAtual;
-        pontoMarcado = true;
-      }
-    }
-  }
+  int distanciaCm = sonar.ping_cm();
+  bool detectouMedio = (distanciaCm > 0 && distanciaCm < LIMIAR_SONAR_CM);
 
   // --- LEITURA BURACO GRANDE (Célula de Carga) ---
-  if (!pontoMarcado) {
-    if (scale.is_ready()) {
-      // Passar "1" no get_units evita que a biblioteca bloqueie o código tirando médias longas
-      float pesoAtual = scale.get_units(1); 
-      
-      if (pesoAtual > LIMIAR_PESO_G) {
-        if (tempoAtual - ultimoAcertoGrande > TEMPO_COOLDOWN_MS) {
-          buraco = "grande";
-          pontuacao = 10;
-          ultimoAcertoGrande = tempoAtual;
-          pontoMarcado = true;
-          
-          // Se os sacos caírem em uma rede e ficarem acumulados, 
-          // comente a linha abaixo. Se eles caírem no chão e a balança esvaziar, 
-          // ou se você quiser zerar o peso base sempre, pode deixar ativado.
-          // scale.tare(); 
-        }
+  if (scale.is_ready()) {
+    // Passar "1" no get_units evita que a biblioteca bloqueie o código tirando médias longas
+    pesoAtual = scale.get_units(1); 
+  }
+  bool detectouGrande = (pesoAtual > LIMIAR_PESO_G);
+
+  // Verifica se algum dos sensores está detectando um objeto no momento
+  bool objetoDetectado = detectouPequeno || detectouMedio || detectouGrande;
+
+  // --- CONTROLE DE STATUS E PONTUAÇÃO (TEMPO DE RETIRADA) ---
+  if (objetoDetectado) {
+    if (status == "LIVRE") {
+      // Computa o ponto apenas quando o sistema estava livre (sem objeto e fora do tempo de espera)
+      if (detectouPequeno) {
+        buraco = "pequeno";
+        pontuacao = 50;
+      } else if (detectouMedio) {
+        buraco = "medio";
+        pontuacao = 30;
+      } else if (detectouGrande) {
+        buraco = "grande";
+        pontuacao = 10;
+        
+        // Se os sacos caírem em uma rede e ficarem acumulados, 
+        // comente a linha abaixo. Se eles caírem no chão e a balança esvaziar, 
+        // ou se você quiser zerar o peso base sempre, pode deixar ativado.
+        // scale.tare(); 
+      }
+      pontoMarcado = true;
+      status = "DETECTADO";
+    } else if (status == "ESPERANDO") {
+      // Se um objeto for detectado durante a espera, nenhum ponto é computado
+      // e o status volta para DETECTADO (o que fará o tempo de espera voltar a 100% ao retirar)
+      status = "DETECTADO";
+    }
+  } else {
+    // Nenhum sensor está detectando objeto no momento
+    if (status == "DETECTADO") {
+      // Assim que o objeto é retirado, entra em ESPERANDO e reinicia a contagem (100% de tempoDeEspera)
+      status = "ESPERANDO";
+      inicioEspera = tempoAtual;
+    } else if (status == "ESPERANDO") {
+      // Aguarda tempoDeEspera segundos (convertido para milissegundos) sem detecções para liberar o sistema
+      if (tempoAtual - inicioEspera >= (unsigned long)(tempoDeEspera * 1000.0)) {
+        status = "LIVRE";
       }
     }
   }
