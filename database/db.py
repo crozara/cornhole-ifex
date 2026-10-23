@@ -22,9 +22,14 @@ import os
 import subprocess
 from typing import Any, Dict, List, Optional
 
+# Configurações dinâmicas de caminhos absolutos baseados no diretório do projeto
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
+DEFAULT_PG_RUN = os.path.join(PROJECT_ROOT, ".pgrun")
+
 # Configurações de Conexão com o PostgreSQL local
 # O 'PG_RUN' aponta para a pasta onde o PostgreSQL cria seu arquivo de comunicação (socket)
-PG_RUN = os.environ.get("PG_RUN", "/home/crozara/projetos/ifex/.pgrun")
+PG_RUN = os.environ.get("PG_RUN", DEFAULT_PG_RUN)
 PG_PORT = os.environ.get("PG_PORT", "5432")
 PG_USER = os.environ.get("PG_USER", "postgres")
 DB_NAME = os.environ.get("DB_NAME", "ifex_cornhole")
@@ -366,8 +371,7 @@ def fazer_backup(caminho_arquivo: Optional[str] = None) -> str:
     Gera um backup SQL completo e consistente do banco de dados PostgreSQL.
     Retorna o caminho absoluto do arquivo .sql gerado.
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    backup_dir = os.path.join(project_root, "backups")
+    backup_dir = os.path.join(PROJECT_ROOT, "backups")
     os.makedirs(backup_dir, exist_ok=True)
 
     if not caminho_arquivo:
@@ -405,8 +409,7 @@ def restaurar_backup(caminho_arquivo: Optional[str] = None) -> str:
     Restaura o banco a partir de um arquivo SQL de backup.
     Se nenhum arquivo for especificado, utiliza o backup mais recente.
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    backup_dir = os.path.join(project_root, "backups")
+    backup_dir = os.path.join(PROJECT_ROOT, "backups")
 
     if not caminho_arquivo:
         copia_recente = os.path.join(backup_dir, "backup_automatico_recente.sql")
@@ -453,8 +456,7 @@ def zerar_banco_dados(senha: str) -> Dict[str, Any]:
         return {"sucesso": False, "mensagem": "Senha incorreta! Operação cancelada."}
 
     # 1. Gera backup de emergência
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    backup_dir = os.path.join(project_root, "backups")
+    backup_dir = os.path.join(PROJECT_ROOT, "backups")
     os.makedirs(backup_dir, exist_ok=True)
     import datetime
     agora = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -490,9 +492,8 @@ def exportar_csv() -> Dict[str, str]:
     """
     Exporta o Ranking Global e o Histórico de Partidas para planilhas CSV na raiz do projeto.
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ranking_csv = os.path.join(project_root, "ranking.csv")
-    historico_csv = os.path.join(project_root, "historico_partidas.csv")
+    ranking_csv = os.path.join(PROJECT_ROOT, "ranking.csv")
+    historico_csv = os.path.join(PROJECT_ROOT, "historico_partidas.csv")
 
     cmd1 = [
         "psql", "-h", PG_RUN, "-p", PG_PORT, "-U", PG_USER, "-d", DB_NAME,

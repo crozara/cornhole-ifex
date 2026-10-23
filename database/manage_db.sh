@@ -21,17 +21,22 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$DIR/.." && pwd)"
 
 # Define onde os dados do banco ficam gravados (pasta local .pgdata)
-PG_DATA="$PROJECT_ROOT/.pgdata"
+PG_DATA="${PG_DATA:-$PROJECT_ROOT/.pgdata}"
 
 # Define onde o arquivo de comunicação do banco fica (pasta local .pgrun)
-PG_RUN="$PROJECT_ROOT/.pgrun"
+PG_RUN="${PG_RUN:-$PROJECT_ROOT/.pgrun}"
 
-# Localização dos executáveis do PostgreSQL 16 no Linux
-PG_BIN="/usr/lib/postgresql/16/bin"
 DB_NAME="ifex_cornhole"
 
-# Adiciona os programas do PostgreSQL ao PATH do terminal
-export PATH="$PG_BIN:$PATH"
+# Localização dinâmica dos executáveis do PostgreSQL no Linux (17, 16, 15, 14 ou PATH do sistema)
+if ! command -v initdb >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; then
+    for v in 17 16 15 14; do
+        if [ -d "/usr/lib/postgresql/$v/bin" ]; then
+            export PATH="/usr/lib/postgresql/$v/bin:$PATH"
+            break
+        fi
+    done
+fi
 
 # Garante que a pasta do socket de comunicação exista
 mkdir -p "$PG_RUN"

@@ -17,6 +17,7 @@ set -e
 # Descobre a pasta onde o projeto está localizado no computador
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PYTHONPATH="$DIR:$PYTHONPATH"
+export PG_RUN="${PG_RUN:-$DIR/.pgrun}"
 
 echo "=========================================================="
 echo "🎯 INICIANDO O CORNHOLE INTELIGENTE - IFEx"

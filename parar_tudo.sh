@@ -10,6 +10,7 @@
 # =============================================================================
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PG_RUN="${PG_RUN:-$DIR/.pgrun}"
 
 # 1. Encerra o Servidor Web e WebSockets na porta 8080
 echo "==> Encerrando Servidor Web na porta 8080..."
