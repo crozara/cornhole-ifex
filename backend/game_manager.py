@@ -31,9 +31,9 @@ PONTOS_PADRAO_SENSORES = {
     "PEQUENO": 8,
     "MEDIO": 6,
     "GRANDE": 4,
+    "PRANCHA": 0,
+    "FORA": -4,
     "BURACO": 8,
-    "PRANCHA": 4,
-    "FORA": 0,
 }
 
 

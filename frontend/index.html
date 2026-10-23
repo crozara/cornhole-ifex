@@ -157,14 +157,15 @@
          ======================================================================= -->
     <footer>
         <div class="shortcuts-hint">
-            <strong>ATALHOS:</strong> [ESPAÇO] Iniciar e Finalizar Rodada &nbsp;|&nbsp; [O] Painel do Operador &nbsp;|&nbsp; [R] Resetar Tela
+            <strong>ATALHOS:</strong> [ESPAÇO] Iniciar/Parar &nbsp;|&nbsp; [1] Pequeno &nbsp;|&nbsp; [2] Médio &nbsp;|&nbsp; [3] Grande &nbsp;|&nbsp; [P] Prancha &nbsp;|&nbsp; [F] Fora &nbsp;|&nbsp; [O] Operador &nbsp;|&nbsp; [R] Reset
         </div>
-        <!-- Botões de Simulação alinhados às pontuações do main.ino -->
+        <!-- Botões de Simulação dos 5 Casos (atualizados pelas constantes em app.js) -->
         <div class="sim-buttons">
-            <button class="btn-sim sim-hole" id="btnSimHole">PEQUENO (+8) [B/1]</button>
-            <button class="btn-sim sim-board" id="btnSimMedio">MÉDIO (+6) [M/2]</button>
-            <button class="btn-sim sim-board" id="btnSimBoard">GRANDE (+4) [P/3]</button>
-            <button class="btn-sim sim-miss" id="btnSimMiss">FORA (0) [F/0]</button>
+            <button class="btn-sim sim-hole" id="btnSimPequeno">PEQUENO (+8) [1]</button>
+            <button class="btn-sim sim-hole" id="btnSimMedio">MÉDIO (+6) [2]</button>
+            <button class="btn-sim sim-hole" id="btnSimGrande">GRANDE (+4) [3]</button>
+            <button class="btn-sim sim-board" id="btnSimPrancha">PRANCHA (0) [P]</button>
+            <button class="btn-sim sim-miss" id="btnSimFora">FORA (-4) [F]</button>
             <button class="btn-sim" id="btnSimReset">RESET [R]</button>
         </div>
     </footer>

@@ -25,11 +25,12 @@ O projeto integra **hardware**, **comunicação serial**, **banco de dados relac
 
 1. **Cadastro do Jogador:** O operador pressiona a tecla **`[O]`** e cadastra o competidor (nome e turma).
 2. **Início da Rodada:** O jogador se posiciona e aperta a barra de **`[ESPAÇO]`**. O cronômetro gigante dispara e os LEDs acendem.
-3. **Durante os Arremessos:** Conforme os saquinhos caem, os pontos sobem na tela com sons de fliperama:
-   * **Buraco Pequeno (`pontosPequeno`):** `+8 pontos`
-   * **Buraco Médio (`pontosMedio`):** `+6 pontos`
-   * **Buraco Grande (`pontosGrande`):** `+4 pontos`
-   * **Fora:** `0 pontos`
+3. **Durante os Arremessos:** Conforme os saquinhos caem, os pontos sobem na tela com sons de fliperama (5 casos possíveis):
+   * **1. Buraco Pequeno (`pontosPequeno`):** `+8 pontos`
+   * **2. Buraco Médio (`pontosMedio`):** `+6 pontos`
+   * **3. Buraco Grande (`pontosGrande`):** `+4 pontos`
+   * **4. Prancha (`PONTOS_PRANCHA`):** `0 ponto`
+   * **5. Fora (`PONTOS_FORA`):** `-4 pontos`
 4. **Finalização Automática:** Ao registrar o **5º arremesso**, o cronômetro **trava imediatamente no exato milissegundo** do último impacto, os dados são persistidos no PostgreSQL e o Ranking Global é atualizado com a fanfarra de vitória!
    * Não é necessário apertar nenhum botão para encerrar a jogada;
    * O competidor pressiona **`[ESPAÇO]`** na tela de vitória apenas para limpar o placar para o próximo jogador;
@@ -134,9 +135,11 @@ Quando terminar o evento ou os testes, execute:
 | **`[ESPAÇO]`** | Durante a rodada | Parada manual antecipada (caso não vá arremessar os 5 saquinhos) |
 | **`[ESPAÇO]`** | Na tela de resultado | **Limpa a tela** e prepara para o próximo competidor da fila |
 | **`[O]`** | A qualquer momento | **Abre o Painel do Operador** para cadastrar ou escolher jogadores |
-| **`[B]`** | A qualquer momento | *(Simulador)* Acerto no **Buraco (+3 pts)** |
-| **`[P]`** | A qualquer momento | *(Simulador)* Acerto na **Prancha (+1 pt)** |
-| **`[F]`** | A qualquer momento | *(Simulador)* Saquinho **Fora (0 pts)** |
+| **`[1]`** | Durante a rodada | *(Simulador)* Caso 1: **Buraco Pequeno (+8 pts)** |
+| **`[2]`** | Durante a rodada | *(Simulador)* Caso 2: **Buraco Médio (+6 pts)** |
+| **`[3]`** | Durante a rodada | *(Simulador)* Caso 3: **Buraco Grande (+4 pts)** |
+| **`[P]`** | Durante a rodada | *(Simulador)* Caso 4: **Prancha (0 pt)** |
+| **`[F]`** | Durante a rodada | *(Simulador)* Caso 5: **Fora (-4 pts)** |
 | **`[R]`** | A qualquer momento | Reseta o display para a tela de espera |
 
 ---

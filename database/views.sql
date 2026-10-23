@@ -67,8 +67,7 @@ ORDER BY posicao ASC;
 -- -----------------------------------------------------------------------------
 -- 2. VIEW DE HISTÓRICO COMPLETO (Auditoria e Relatório em Planilha)
 -- -----------------------------------------------------------------------------
--- Agrupa todas as partidas e calcula quantos saquinhos caíram nos buracos
--- e quantos foram fora.
+-- Agrupa todas as partidas e contabiliza os arremessos nos buracos, prancha e fora.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW view_historico_partidas AS
 SELECT 
@@ -83,8 +82,8 @@ SELECT
     p.finalizada_em,
     COUNT(a.id) AS total_saquinhos_computados,
     -- Contagem condicional por tipo de acerto usando o recurso FILTER do PostgreSQL
-    COUNT(a.id) FILTER (WHERE a.sensor_codigo IN ('BURACO', 'PEQUENO', 'MEDIO')) AS saquinhos_buraco,
-    COUNT(a.id) FILTER (WHERE a.sensor_codigo IN ('PRANCHA', 'GRANDE')) AS saquinhos_prancha,
+    COUNT(a.id) FILTER (WHERE a.sensor_codigo IN ('PEQUENO', 'MEDIO', 'GRANDE', 'BURACO')) AS saquinhos_buraco,
+    COUNT(a.id) FILTER (WHERE a.sensor_codigo = 'PRANCHA') AS saquinhos_prancha,
     COUNT(a.id) FILTER (WHERE a.sensor_codigo = 'FORA') AS saquinhos_fora
 FROM partidas p
 JOIN jogadores j ON p.jogador_id = j.id

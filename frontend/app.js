@@ -10,9 +10,29 @@
  * 3. Toca os sons nostálgicos 8-bit chamando o 'audio.js'.
  * 4. Renderiza na tela a tabela do Ranking Top 10 com pódio e tempos.
  * 5. Recebe e computa as pontuações vindas do main.ino via SerialHandler
- *    (pontosPequeno = 8, pontosMedio = 6, pontosGrande = 4).
+ *    ou simuladas pelo teclado ([1], [2], [3], [P], [F]).
  * =============================================================================
  */
+
+// =============================================================================
+// 0. CONSTANTES DE PONTUAÇÃO DOS 5 CASOS (FÁCIL VISUALIZAÇÃO E MODIFICAÇÃO)
+// =============================================================================
+// Altere os valores abaixo caso queira ajustar a pontuação de qualquer caso:
+const PONTOS_PEQUENO = 8;   // Caso 1: Buraco pequeno (+8 pontos) — Tecla [1]
+const PONTOS_MEDIO   = 6;   // Caso 2: Buraco médio (+6 pontos)   — Tecla [2]
+const PONTOS_GRANDE  = 4;   // Caso 3: Buraco grande (+4 pontos)  — Tecla [3]
+const PONTOS_PRANCHA = 0;   // Caso 4: Prancha (0 ponto)          — Tecla [P]
+const PONTOS_FORA    = -4;  // Caso 5: Fora (-4 pontos)           — Tecla [F]
+
+// Mapa unificado de pontuações padrão na interface web
+const TABELA_PONTOS_CASOS = {
+    PEQUENO: PONTOS_PEQUENO,
+    MEDIO:   PONTOS_MEDIO,
+    GRANDE:  PONTOS_GRANDE,
+    PRANCHA: PONTOS_PRANCHA,
+    FORA:    PONTOS_FORA,
+    BURACO:  PONTOS_PEQUENO
+};
 
 // -----------------------------------------------------------------------------
 // 1. Mapeamento dos Elementos Visuais do HTML (DOM)
@@ -48,11 +68,12 @@ const dom = {
     btnActionEspaco: document.getElementById('btnActionEspaco'), // Botão principal de ação arcade (Espaço)
     btnActionIcon: document.getElementById('btnActionIcon'),   // Ícone do botão principal
     btnActionLabel: document.getElementById('btnActionLabel'), // Texto do botão principal
-    btnSimHole: document.getElementById('btnSimHole'),         // Botão de simular buraco pequeno (+8)
-    btnSimMedio: document.getElementById('btnSimMedio'),       // Botão de simular buraco médio (+6)
-    btnSimBoard: document.getElementById('btnSimBoard'),       // Botão de simular buraco grande (+4)
-    btnSimMiss: document.getElementById('btnSimMiss'),         // Botão de simular fora (0)
-    btnSimReset: document.getElementById('btnSimReset'),       // Botão de resetar
+    btnSimPequeno: document.getElementById('btnSimPequeno'),   // Botão Caso 1: Buraco pequeno [1]
+    btnSimMedio: document.getElementById('btnSimMedio'),       // Botão Caso 2: Buraco médio [2]
+    btnSimGrande: document.getElementById('btnSimGrande'),     // Botão Caso 3: Buraco grande [3]
+    btnSimPrancha: document.getElementById('btnSimPrancha'),   // Botão Caso 4: Prancha [P]
+    btnSimFora: document.getElementById('btnSimFora'),         // Botão Caso 5: Fora [F]
+    btnSimReset: document.getElementById('btnSimReset'),       // Botão de resetar [R]
     btnSalvarBackup: document.getElementById('btnSalvarBackup'), // Botão para salvar cópia de segurança
     btnRestaurarBackup: document.getElementById('btnRestaurarBackup'), // Botão para restaurar backup
     btnExportarCsv: document.getElementById('btnExportarCsv'),   // Botão para baixar planilhas CSV
@@ -60,11 +81,6 @@ const dom = {
     securityFeedback: document.getElementById('securityFeedback'), // Feedback visual de segurança
     backupNoticeLabel: document.getElementById('backupNoticeLabel') // Rótulo de status de backup
 };
-
-// Constantes de pontuação espelhadas do main.ino
-const PONTOS_PEQUENO = 8;
-const PONTOS_MEDIO   = 6;
-const PONTOS_GRANDE  = 4;
 
 // -----------------------------------------------------------------------------
 // 2. Variáveis de Estado Interno da Tela
@@ -77,6 +93,37 @@ let activeMatchId = null;          // ID da partida que está rolando agora
 let currentSaquinhos = [];         // Histórico dos saquinhos arremessados na rodada atual
 let selectedGroup = "";            // Turma/grupo atualmente filtrado (vazio = GERAL)
 let availableGroups = [];          // Lista de todas as turmas cadastradas no sistema
+
+/**
+ * Formata um valor numérico de pontos com sinal (ex: "+8", "0", "-4")
+ */
+function formatSignedPoints(pts) {
+    const n = Number(pts) || 0;
+    return n > 0 ? `+${n}` : `${n}`;
+}
+
+/**
+ * Formata o placar principal de 2 dígitos aceitando números negativos (ex: "08", "00", "-04")
+ */
+function formatScoreDisplay(pts) {
+    const n = Number(pts) || 0;
+    if (n < 0) {
+        return `-${String(Math.abs(n)).padStart(2, '0')}`;
+    }
+    return String(n).padStart(2, '0');
+}
+
+/**
+ * Atualiza os textos dos botões do rodapé automaticamente com base nas constantes
+ * definidas no topo deste arquivo.
+ */
+function atualizarRotulosBotoesSimulacao() {
+    if (dom.btnSimPequeno) dom.btnSimPequeno.textContent = `PEQUENO (${formatSignedPoints(PONTOS_PEQUENO)}) [1]`;
+    if (dom.btnSimMedio)   dom.btnSimMedio.textContent   = `MÉDIO (${formatSignedPoints(PONTOS_MEDIO)}) [2]`;
+    if (dom.btnSimGrande)  dom.btnSimGrande.textContent  = `GRANDE (${formatSignedPoints(PONTOS_GRANDE)}) [3]`;
+    if (dom.btnSimPrancha) dom.btnSimPrancha.textContent = `PRANCHA (${formatSignedPoints(PONTOS_PRANCHA)}) [P]`;
+    if (dom.btnSimFora)    dom.btnSimFora.textContent    = `FORA (${formatSignedPoints(PONTOS_FORA)}) [F]`;
+}
 
 // -----------------------------------------------------------------------------
 // 3. Funções do Cronômetro de Alta Fluidez (60 FPS)
@@ -125,7 +172,7 @@ function stopTimerLoop() {
 // 4. Animações e Efeitos Visuais
 // -----------------------------------------------------------------------------
 /**
- * Dispara um texto flutuante neon na tela quando o competidor acerta o alvo
+ * Dispara um texto flutuante neon na tela quando o competidor realiza uma jogada
  */
 function triggerScorePopup(texto, cor) {
     dom.scorePopup.textContent = texto;
@@ -236,23 +283,27 @@ function showSecurityFeedback(texto, cor = "var(--neon-cyan)") {
 // -----------------------------------------------------------------------------
 /**
  * Resolve quantos pontos um arremesso vale com base no objeto vindo do Back-end / Arduino
+ * ou utilizando as constantes dos 5 casos definidas no topo deste arquivo.
  */
 function obterPontosArremesso(arremesso) {
     if (!arremesso) return 0;
     if (arremesso.pontos !== undefined && arremesso.pontos !== null) {
         return Number(arremesso.pontos);
     }
-    const sensor = String(arremesso.sensor || arremesso.buraco || '').toUpperCase();
-    if (sensor === 'PEQUENO' || sensor === 'BURACO') return PONTOS_PEQUENO;
-    if (sensor === 'MEDIO' || sensor === 'MÉDIO') return PONTOS_MEDIO;
-    if (sensor === 'GRANDE' || sensor === 'PRANCHA') return PONTOS_GRANDE;
+    const sensor = String(arremesso.sensor || arremesso.buraco || '').toUpperCase().replace('MÉDIO', 'MEDIO');
+    if (sensor in TABELA_PONTOS_CASOS) {
+        return TABELA_PONTOS_CASOS[sensor];
+    }
     return 0;
 }
 
 /**
  * Atualiza o HUD dos 5 saquinhos na tela do fliperama:
- * - Ícone e pontuação exata para PEQUENO (+8), MÉDIO (+6), GRANDE (+4), FORA (0)
- * - Realça o próximo arremesso ativo quando em jogo
+ * - Caso 1: PEQUENO (+8 PTS)
+ * - Caso 2: MÉDIO (+6 PTS)
+ * - Caso 3: GRANDE (+4 PTS)
+ * - Caso 4: PRANCHA (0 PTO)
+ * - Caso 5: FORA (-4 PTS)
  */
 function renderBagSlots(saquinhos = []) {
     currentSaquinhos = saquinhos || [];
@@ -281,28 +332,30 @@ function renderBagSlots(saquinhos = []) {
 
         if (arremesso) {
             const pts = obterPontosArremesso(arremesso);
-            const sensor = String(arremesso.sensor || arremesso.buraco || '').toUpperCase();
+            const sensor = String(arremesso.sensor || arremesso.buraco || '').toUpperCase().replace('MÉDIO', 'MEDIO');
+            const sufixo = Math.abs(pts) === 1 ? 'PTO' : 'PTS';
+            const labelPontos = `${formatSignedPoints(pts)} ${sufixo}`;
 
-            if (sensor === 'PEQUENO' || sensor === 'BURACO') {
+            if (sensor === 'PEQUENO' || sensor === 'MEDIO' || sensor === 'GRANDE' || sensor === 'BURACO') {
                 slot.classList.add('scored-hole');
                 if (iconEl) iconEl.textContent = '🎯';
-                if (statusEl) statusEl.textContent = `+${pts} PTS`;
-            } else if (sensor === 'MEDIO' || sensor === 'MÉDIO') {
-                slot.classList.add('scored-hole');
-                if (iconEl) iconEl.textContent = '🎯';
-                if (statusEl) statusEl.textContent = `+${pts} PTS`;
-            } else if (sensor === 'GRANDE' || sensor === 'PRANCHA') {
+                if (statusEl) statusEl.textContent = labelPontos;
+            } else if (sensor === 'PRANCHA') {
                 slot.classList.add('scored-board');
-                if (iconEl) iconEl.textContent = '🎯';
-                if (statusEl) statusEl.textContent = `+${pts} ${pts === 1 ? 'PTO' : 'PTS'}`;
+                if (iconEl) iconEl.textContent = '🪵';
+                if (statusEl) statusEl.textContent = labelPontos;
+            } else if (sensor === 'FORA') {
+                slot.classList.add('scored-miss');
+                if (iconEl) iconEl.textContent = '💨';
+                if (statusEl) statusEl.textContent = labelPontos;
             } else if (pts > 0) {
-                slot.classList.add('scored-board');
+                slot.classList.add('scored-hole');
                 if (iconEl) iconEl.textContent = '🎯';
-                if (statusEl) statusEl.textContent = `+${pts} PTS`;
+                if (statusEl) statusEl.textContent = labelPontos;
             } else {
                 slot.classList.add('scored-miss');
                 if (iconEl) iconEl.textContent = '💨';
-                if (statusEl) statusEl.textContent = '0 PTS';
+                if (statusEl) statusEl.textContent = labelPontos;
             }
         } else {
             // Se o jogo está rolando e este é o próximo saquinho a ser lançado
@@ -375,8 +428,8 @@ function applyState(data) {
         dom.playerTag.textContent = "---";
     }
 
-    // Atualiza placar na tela
-    dom.displayScore.textContent = String(data.pontuacao_atual || 0).padStart(2, '0');
+    // Atualiza placar na tela (suporta valores positivos, zero e negativos)
+    dom.displayScore.textContent = formatScoreDisplay(data.pontuacao_atual || 0);
 
     // Atualiza Ranking, turmas e lista de seleção
     if (data.ranking && !selectedGroup) renderRankingTable(data.ranking);
@@ -506,29 +559,36 @@ function connectWebSocket() {
                     saquinhos: []
                 });
             } 
-            // 3. Saquinho pontuou (recebe os dados do main.ino via SerialHandler, toca som e computa placar)
+            // 3. Saquinho pontuou (recebe os dados do main.ino via SerialHandler ou das teclas 1, 2, 3, P, F)
             else if (msg.tipo === "SAQUINHO_PONTUOU") {
-                const sensor = String(msg.sensor || msg.buraco || '').toUpperCase();
+                const sensor = String(msg.sensor || msg.buraco || '').toUpperCase().replace('MÉDIO', 'MEDIO');
                 const pts = obterPontosArremesso(msg);
+                const ptsFormatado = formatSignedPoints(pts);
 
                 if (sensor === 'PEQUENO' || sensor === 'BURACO') {
                     window.arcadeAudio.playHole();
-                    triggerScorePopup(`+${pts} BURACO PEQUENO! 🎯`, "#ff0055");
-                } else if (sensor === 'MEDIO' || sensor === 'MÉDIO') {
+                    triggerScorePopup(`${ptsFormatado} BURACO PEQUENO! 🎯`, "#ff0055");
+                } else if (sensor === 'MEDIO') {
                     window.arcadeAudio.playHole();
-                    triggerScorePopup(`+${pts} BURACO MÉDIO! 🎯`, "#ffe600");
-                } else if (sensor === 'GRANDE' || sensor === 'PRANCHA') {
+                    triggerScorePopup(`${ptsFormatado} BURACO MÉDIO! 🎯`, "#ffe600");
+                } else if (sensor === 'GRANDE') {
+                    window.arcadeAudio.playHole();
+                    triggerScorePopup(`${ptsFormatado} BURACO GRANDE! 🎯`, "#00ff66");
+                } else if (sensor === 'PRANCHA') {
                     window.arcadeAudio.playBoard();
-                    triggerScorePopup(`+${pts} BURACO GRANDE! 🎯`, "#00f0ff");
+                    triggerScorePopup(`${ptsFormatado} PRANCHA! 🪵`, "#00f0ff");
+                } else if (sensor === 'FORA') {
+                    window.arcadeAudio.playMiss();
+                    triggerScorePopup(`${ptsFormatado} FORA! 💨`, "#ff4444");
                 } else if (pts > 0) {
                     window.arcadeAudio.playHole();
-                    triggerScorePopup(`+${pts} PONTOS! 🎯`, "#00ff66");
+                    triggerScorePopup(`${ptsFormatado} PONTOS! 🎯`, "#00ff66");
                 } else {
                     window.arcadeAudio.playMiss();
-                    triggerScorePopup("FORA! 💨", "#888888");
+                    triggerScorePopup(`${ptsFormatado} FORA! 💨`, "#888888");
                 }
 
-                // Adiciona o arremesso ao rack visual e computa a pontuação total
+                // Adiciona o arremesso ao rack visual (conta 1 jogada no limite de 5) e computa a pontuação total
                 currentSaquinhos.push({
                     numero: msg.numero_saquinho,
                     sensor: sensor,
@@ -540,7 +600,7 @@ function connectWebSocket() {
                     ? Number(msg.pontuacao_total)
                     : currentSaquinhos.reduce((acc, s) => acc + obterPontosArremesso(s), 0);
 
-                dom.displayScore.textContent = String(totalComputado).padStart(2, '0');
+                dom.displayScore.textContent = formatScoreDisplay(totalComputado);
                 renderBagSlots(currentSaquinhos);
 
                 // TRAVA IMEDIATA NO FRONT-END NO 5º ARREMESSO:
@@ -672,6 +732,18 @@ function sendWs(payload) {
     }
 }
 
+/**
+ * Dispara a simulação de um dos 5 casos de arremesso.
+ * Cada acionamento conta como 1 jogada dentro do limite de 5 jogadas por jogador.
+ */
+function simularCasoArremesso(sensor, pontos) {
+    sendWs({
+        tipo: "SIMULAR_ARREMESSO",
+        sensor: sensor,
+        pontos: pontos
+    });
+}
+
 // -----------------------------------------------------------------------------
 // 7. Controle da Janela do Operador (Modal [O])
 // -----------------------------------------------------------------------------
@@ -771,18 +843,21 @@ if (dom.btnActionEspaco) {
     dom.btnActionEspaco.addEventListener('click', () => sendWs({ tipo: "ACAO_ESPACO" }));
 }
 
-// Botões de arremesso e reset do deck arcade (enviam sensor e pontuação iguais ao main.ino)
-if (dom.btnSimHole) {
-    dom.btnSimHole.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "pequeno", pontos: PONTOS_PEQUENO }));
+// Botões de simulação dos 5 casos no rodapé da interface web
+if (dom.btnSimPequeno) {
+    dom.btnSimPequeno.addEventListener('click', () => simularCasoArremesso("pequeno", PONTOS_PEQUENO));
 }
 if (dom.btnSimMedio) {
-    dom.btnSimMedio.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "medio", pontos: PONTOS_MEDIO }));
+    dom.btnSimMedio.addEventListener('click', () => simularCasoArremesso("medio", PONTOS_MEDIO));
 }
-if (dom.btnSimBoard) {
-    dom.btnSimBoard.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "grande", pontos: PONTOS_GRANDE }));
+if (dom.btnSimGrande) {
+    dom.btnSimGrande.addEventListener('click', () => simularCasoArremesso("grande", PONTOS_GRANDE));
 }
-if (dom.btnSimMiss) {
-    dom.btnSimMiss.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "fora", pontos: 0 }));
+if (dom.btnSimPrancha) {
+    dom.btnSimPrancha.addEventListener('click', () => simularCasoArremesso("prancha", PONTOS_PRANCHA));
+}
+if (dom.btnSimFora) {
+    dom.btnSimFora.addEventListener('click', () => simularCasoArremesso("fora", PONTOS_FORA));
 }
 if (dom.btnSimReset) {
     dom.btnSimReset.addEventListener('click', () => sendWs({ tipo: "RESET_ESPERA" }));
@@ -864,28 +939,34 @@ window.addEventListener('keydown', (e) => {
         sendWs({ tipo: "ACAO_ESPACO" });
     }
 
-    // Tecla B ou 1: Simula acerto no BURACO PEQUENO (+8)
-    else if (e.key.toLowerCase() === 'b' || e.key === '1') {
+    // Tecla 1: Caso 1 — Simula acerto no BURACO PEQUENO (PONTOS_PEQUENO = +8)
+    else if (e.key === '1') {
         e.preventDefault();
-        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "pequeno", pontos: PONTOS_PEQUENO });
+        simularCasoArremesso("pequeno", PONTOS_PEQUENO);
     }
 
-    // Tecla M ou 2: Simula acerto no BURACO MÉDIO (+6)
-    else if (e.key.toLowerCase() === 'm' || e.key === '2') {
+    // Tecla 2: Caso 2 — Simula acerto no BURACO MÉDIO (PONTOS_MEDIO = +6)
+    else if (e.key === '2') {
         e.preventDefault();
-        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "medio", pontos: PONTOS_MEDIO });
+        simularCasoArremesso("medio", PONTOS_MEDIO);
     }
 
-    // Tecla P, G ou 3: Simula acerto no BURACO GRANDE (+4)
-    else if (e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 'g' || e.key === '3') {
+    // Tecla 3: Caso 3 — Simula acerto no BURACO GRANDE (PONTOS_GRANDE = +4)
+    else if (e.key === '3') {
         e.preventDefault();
-        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "grande", pontos: PONTOS_GRANDE });
+        simularCasoArremesso("grande", PONTOS_GRANDE);
     }
 
-    // Tecla F ou 0: Simula saquinho FORA (0)
-    else if (e.key.toLowerCase() === 'f' || e.key === '0') {
+    // Tecla P: Caso 4 — Simula acerto em PRANCHA (PONTOS_PRANCHA = 0)
+    else if (e.key.toLowerCase() === 'p') {
         e.preventDefault();
-        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "fora", pontos: 0 });
+        simularCasoArremesso("prancha", PONTOS_PRANCHA);
+    }
+
+    // Tecla F: Caso 5 — Simula saquinho FORA (PONTOS_FORA = -4)
+    else if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        simularCasoArremesso("fora", PONTOS_FORA);
     }
 
     // Tecla O: Abre o Painel do Operador
@@ -906,12 +987,15 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-// Inicialização: conecta o WebSocket e carrega as turmas existentes
+// Inicialização: atualiza rótulos com as constantes, conecta o WebSocket e carrega as turmas
 window.addEventListener('DOMContentLoaded', () => {
+    atualizarRotulosBotoesSimulacao();
     connectWebSocket();
     const apiBase = window.location.host ? '' : 'http://localhost:8080';
     fetch(`${apiBase}/api/grupos`)
         .then(r => r.json())
         .then(data => populateGroupFilter(data))
         .catch(() => {});
+});
+
 });

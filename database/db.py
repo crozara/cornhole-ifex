@@ -33,9 +33,9 @@ PONTOS_PADRAO_SENSORES = {
     "PEQUENO": 8,
     "MEDIO": 6,
     "GRANDE": 4,
+    "PRANCHA": 0,
+    "FORA": -4,
     "BURACO": 8,
-    "PRANCHA": 4,
-    "FORA": 0,
 }
 
 
@@ -188,8 +188,12 @@ def registrar_arremesso(
     pontos_padrao = PONTOS_PADRAO_SENSORES.get(codigo_limpo, 0)
     pontos_efetivos = int(pontos) if pontos is not None else pontos_padrao
 
-    # Garante que o sensor esteja cadastrado na tabela 'sensores' com a pontuação correspondente
+    # Garante que restrições antigas de pontos >= 0 sejam removidas (para aceitar FORA = -4)
+    # e que o sensor esteja cadastrado na tabela 'sensores' com a pontuação correspondente
     _execute_sql(f"""
+        ALTER TABLE sensores DROP CONSTRAINT IF EXISTS sensores_pontos_check;
+        ALTER TABLE partidas DROP CONSTRAINT IF EXISTS partidas_pontuacao_total_check;
+        ALTER TABLE arremessos DROP CONSTRAINT IF EXISTS arremessos_pontos_check;
         INSERT INTO sensores (codigo, pontos, descricao, ativo)
         VALUES ('{codigo_limpo}', {pontos_efetivos}, 'Sensor {codigo_limpo}', TRUE)
         ON CONFLICT (codigo) DO UPDATE SET pontos = EXCLUDED.pontos;
