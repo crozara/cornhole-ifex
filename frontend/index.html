@@ -7,7 +7,7 @@
     <title>Cornhole Inteligente - IFEx</title>
     
     <!-- Folha de Estilos Neon Cyberpunk Retrô -->
-    <link rel="stylesheet" href="/style.css?v=20261022_01">
+    <link rel="stylesheet" href="/style.css?v=20261023_02">
 </head>
 <body>
 
@@ -153,11 +153,11 @@
 
     <!-- =======================================================================
          3. RODAPÉ (FOOTER)
-         Atalhos e botões de teste discretos no rodapé
+         Atalhos e botões de teste ocultos por padrão (tecla [V] para exibir/ocultar)
          ======================================================================= -->
-    <footer>
+    <footer id="arcadeFooter">
         <div class="shortcuts-hint">
-            <strong>ATALHOS:</strong> [ESPAÇO] Iniciar/Parar &nbsp;|&nbsp; [1] Pequeno &nbsp;|&nbsp; [2] Médio &nbsp;|&nbsp; [3] Grande &nbsp;|&nbsp; [P] Prancha &nbsp;|&nbsp; [F] Fora &nbsp;|&nbsp; [O] Operador &nbsp;|&nbsp; [Ctrl] Sensores &nbsp;|&nbsp; [R] Reset
+            <strong>ATALHOS [V]:</strong> [ESPAÇO] Iniciar/Parar &nbsp;|&nbsp; [1] Pequeno &nbsp;|&nbsp; [2] Médio &nbsp;|&nbsp; [3] Grande &nbsp;|&nbsp; [P] Prancha &nbsp;|&nbsp; [F] Fora &nbsp;|&nbsp; [O] Operador &nbsp;|&nbsp; [Ctrl] Sensores &nbsp;|&nbsp; [V] Ocultar &nbsp;|&nbsp; [R] Reset
         </div>
         <!-- Botões de Simulação dos 5 Casos (atualizados pelas constantes em app.js) -->
         <div class="sim-buttons">
@@ -167,6 +167,7 @@
             <button class="btn-sim sim-board" id="btnSimPrancha">PRANCHA (0) [P]</button>
             <button class="btn-sim sim-miss" id="btnSimFora">FORA (-4) [F]</button>
             <button class="btn-sim" id="btnSimReset">RESET [R]</button>
+            <button class="btn-sim btn-close-footer" id="btnCloseFooter" title="Ocultar barra de atalhos [V]">&times;</button>
         </div>
     </footer>
 
@@ -392,7 +393,7 @@
          - audio.js: sintetizador Web Audio API de 8-bit
          - app.js: motor de conexão WebSocket, cronômetro e atalhos de teclado
          ======================================================================= -->
-    <script src="/audio.js?v=20261023_01"></script>
-    <script src="/app.js?v=20261023_01"></script>
+    <script src="/audio.js?v=20261023_02"></script>
+    <script src="/app.js?v=20261023_02"></script>
 </body>
 </html>

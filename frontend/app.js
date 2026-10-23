@@ -100,7 +100,11 @@ const dom = {
     diagTerminalTime: document.getElementById('diagTerminalTime'),
     btnTestPequeno: document.getElementById('btnTestPequeno'),
     btnTestMedio: document.getElementById('btnTestMedio'),
-    btnTestGrande: document.getElementById('btnTestGrande')
+    btnTestGrande: document.getElementById('btnTestGrande'),
+
+    // Barra de Atalhos e Simulação (Rodapé)
+    arcadeFooter: document.getElementById('arcadeFooter'),
+    btnCloseFooter: document.getElementById('btnCloseFooter')
 };
 
 // -----------------------------------------------------------------------------
@@ -476,6 +480,24 @@ if (dom.btnTestMedio) {
 }
 if (dom.btnTestGrande) {
     dom.btnTestGrande.addEventListener('click', () => simularCasoArremesso("grande", PONTOS_GRANDE));
+}
+
+/**
+ * Alterna a visibilidade da barra inferior de atalhos e simulação (Tecla [V])
+ */
+function toggleShortcutsFooter(force) {
+    if (!dom.arcadeFooter) return;
+    const isCurrentlyVisible = dom.arcadeFooter.classList.contains('visible');
+    const targetState = (force !== undefined) ? force : !isCurrentlyVisible;
+    if (targetState) {
+        dom.arcadeFooter.classList.add('visible');
+    } else {
+        dom.arcadeFooter.classList.remove('visible');
+    }
+}
+
+if (dom.btnCloseFooter) {
+    dom.btnCloseFooter.addEventListener('click', () => toggleShortcutsFooter(false));
 }
 
 /**
@@ -1077,10 +1099,11 @@ window.addEventListener('keydown', (e) => {
         }
     }
 
-    // Tecla ESC: Fecha qualquer janela/modal aberto
+    // Tecla ESC: Fecha qualquer janela/modal aberto ou a barra de atalhos
     if (e.key === 'Escape') {
         toggleOperatorModal(false);
         toggleDiagnosticModal(false);
+        toggleShortcutsFooter(false);
         return;
     }
 
@@ -1132,6 +1155,12 @@ window.addEventListener('keydown', (e) => {
     else if (e.key.toLowerCase() === 'o') {
         e.preventDefault();
         toggleOperatorModal();
+    }
+
+    // Tecla V: Alterna a exibição da barra de atalhos e simulação
+    else if (e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        toggleShortcutsFooter();
     }
 
     // Tecla R: Reseta a tela para espera

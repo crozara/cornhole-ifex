@@ -661,20 +661,68 @@ main {
 
 /* --------------------------------------------------------------------------
    BARRA DE SIMULAÇÃO & ATALHOS (RODAPÉ)
+   Oculta por padrão para manter o fliperama limpo.
+   Pressione [V] a qualquer momento para exibir ou ocultar.
    -------------------------------------------------------------------------- */
 footer {
     background: rgba(10, 12, 18, 0.95);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     padding: 12px 30px;
-    display: flex;
+    display: none; /* Inicia oculto por padrão */
     justify-content: space-between;
     align-items: center;
     font-size: 0.8rem;
     color: var(--text-dim);
+    position: relative;
+    z-index: 50;
+}
+
+footer.visible {
+    display: flex;
+    animation: slideUpFooter 0.25s ease-out;
+}
+
+@keyframes slideUpFooter {
+    from {
+        opacity: 0;
+        transform: translateY(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.shortcuts-hint {
+    letter-spacing: 0.5px;
+}
+
+.shortcuts-hint strong {
+    color: var(--neon-cyan);
+}
+
+.btn-close-footer {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 2px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-left: 6px;
+    transition: all 0.2s;
+}
+
+.btn-close-footer:hover {
+    background: rgba(255, 0, 85, 0.2);
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
 }
 
 .sim-buttons {
     display: flex;
+    align-items: center;
     gap: 8px;
 }
 
