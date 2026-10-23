@@ -23,9 +23,9 @@ O projeto integra **hardware**, **comunicação serial**, **banco de dados relac
 
 ## 🕹️ Dinâmica de Jogo & Regras
 
-1. **Cadastro do Jogador:** O operador pressiona a tecla **`[O]`** e cadastra o competidor (nome e turma).
+1. **Cadastro do Jogador:** O operador pressiona a tecla **`[O]`** e cadastra o competidor (nome e turma/curso). Também é possível selecionar participantes já cadastrados na fila de espera.
 2. **Início da Rodada:** O jogador se posiciona e aperta a barra de **`[ESPAÇO]`**. O cronômetro gigante dispara e os LEDs acendem.
-3. **Durante os Arremessos:** Conforme os saquinhos caem, os pontos sobem na tela com sons de fliperama (5 casos possíveis):
+3. **Durante os Arremessos:** Conforme os saquinhos caem, os pontos sobem na tela com sons nostálgicos de fliperama (5 casos possíveis):
    * **1. Buraco Pequeno (`pontosPequeno`):** `+8 pontos`
    * **2. Buraco Médio (`pontosMedio`):** `+6 pontos`
    * **3. Buraco Grande (`pontosGrande`):** `+4 pontos`
@@ -35,6 +35,8 @@ O projeto integra **hardware**, **comunicação serial**, **banco de dados relac
    * Não é necessário apertar nenhum botão para encerrar a jogada;
    * O competidor pressiona **`[ESPAÇO]`** na tela de vitória apenas para limpar o placar para o próximo jogador;
    * Caso o competidor queira desistir ou encerrar antes dos 5 arremessos, a tecla **`[ESPAÇO]`** ainda funciona como parada manual antecipada.
+5. **Filtro de Ranking por Turma ou Geral:** O painel conta com uma aba **GERAL** e um menu suspenso para filtrar o ranking por turma/curso específico (ex: `Info-3B`, `Meca-2A`), mantendo sempre a melhor tentativa de cada aluno.
+6. **Modo Fliperama Limpo:** A tela voltada para o público não exibe atalhos ou botões de teste, mantendo imersão total. Para os operadores e juízes, a barra pode ser revelada a qualquer momento pressionando a tecla **`[V]`**.
 
 ---
 
@@ -63,6 +65,18 @@ Como no Cornhole o saquinho pode permanecer sobre o sensor ou exigir que o jogad
   * Caso qualquer objeto seja detectado novamente enquanto estiver em **`ESPERANDO`** (por exemplo, o jogador esbarrando no sensor ao puxar o saquinho), **nenhum ponto é marcado**, o status retorna para **`DETECTADO`** e, quando o objeto for retirado outra vez, o tempo de espera é **reiniciado em 100%** (terá que aguardar os `3.0` segundos completos novamente).
   * Após transcorrerem os `tempoDeEspera` segundos ininterruptos sem detecções, o sistema retorna ao status **`LIVRE`** para o próximo lançamento.
 
+### 3. Painel Oculto de Diagnóstico dos Sensores (HUD Técnico)
+
+Para testes de bancada, verificação de fiação e calibração durante o evento, o sistema possui um **painel secreto de telemetria**, ativado pelas teclas **`[Ctrl]`** ou **`[F2]`** no dashboard (totalmente invisível ao público):
+
+* **Status das Conexões:** Exibe a porta física do Arduino (`/dev/tty*` com baudrate e indicador luminoso) ou aviso de `MODO SIMULADOR`, conexão WebSocket em 60 FPS e status do socket PostgreSQL (`.pgrun`);
+* **Contadores de Sensores em Tempo Real:**
+  * 🔴 **Buraco Pequeno:** Laser ToF `VL53L0X` (`I2C SDA/SCL`, critério `< 100mm`, contagem de acertos e timestamp do último disparo);
+  * 🟡 **Buraco Médio:** Ultrassônico `HC-SR04` (`Trig 5 / Echo 6`, critério `< 15cm`, contagem de acertos e timestamp do último disparo);
+  * 🟢 **Buraco Grande:** Célula de Carga `HX711` (`DOUT 3 / SCK 2`, critério `> 100g`, contagem de acertos e timestamp do último disparo);
+* **Feed Serial ao Vivo:** Mini-terminal exibindo os últimos pacotes JSON recebidos diretamente do Arduino;
+* **Disparos de Teste:** Botões de teste rápido integrados em cada sensor para validação de bancada sem necessidade de arremessos físicos.
+
 ---
 
 ## 🗄️ A Engenharia de Banco de Dados (PostgreSQL 16)
@@ -71,7 +85,7 @@ Como parte dos estudos avançados de banco de dados, as regras de negócio foram
 
 * **Triggers em PL/pgSQL:** Ao registrar um arremesso na tabela `arremessos`, uma trigger busca o valor do sensor na tabela `sensores` e outra trigger recalcula automaticamente o `pontuacao_total` na tabela `partidas`.
 * **Critério de Desempate (A sacada do BD):** Em caso de empate de pontos, o PostgreSQL desempata ordenando pelo **menor tempo de execução da rodada** (`tempo_ms ASC`).
-* **Deduplicação de Jogador:** A view analítica utiliza Funções de Janela (`ROW_NUMBER() OVER (PARTITION BY jogador_id ORDER BY pontuacao_total DESC, tempo_ms ASC)`) para garantir que **apenas a melhor tentativa de cada competidor** entre no Top 10, mesmo se a mesma pessoa jogar várias vezes.
+* **Deduplicação de Jogador e Filtro por Turmas:** A view analítica utiliza Funções de Janela (`ROW_NUMBER() OVER (PARTITION BY jogador_id ORDER BY pontuacao_total DESC, tempo_ms ASC)`) para garantir que **apenas a melhor tentativa de cada competidor** entre no Top 10 global ou na listagem filtrada por turma/curso (`Info-3B`, `Meca-2A`, etc.), mesmo se a mesma pessoa jogar várias vezes.
 
 ---
 
@@ -91,12 +105,17 @@ sudo apt install -y python3 python3-pip postgresql postgresql-contrib psmisc
 > ```
 > *(Faça logoff e logon novamente para aplicar).*
 
-### 2. Dependências do Python
-Instale os pacotes necessários através do `requirements.txt`:
+### 2. Dependências do Python (Global ou Virtualenv)
+O sistema é 100% portável e automatizado: detecta dinamicamente a pasta do repositório em qualquer computador e ativa automaticamente o ambiente virtual (`.venv` ou `venv`), se presente:
 ```bash
+# (Opcional) Criar ambiente virtual dedicado:
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Instalar dependências:
 pip install -r requirements.txt
 ```
-*(Ou instale via apt no Ubuntu: `sudo apt install python3-websockets python3-serial`)*
+*(Alternativa via apt: `sudo apt install python3-websockets python3-serial`)*
 
 ---
 
@@ -134,23 +153,45 @@ Quando terminar o evento ou os testes, execute:
 | **`5º Arremesso`** | Durante a rodada | **Trava o cronômetro automaticamente**, salva no PostgreSQL e atualiza o ranking |
 | **`[ESPAÇO]`** | Durante a rodada | Parada manual antecipada (caso não vá arremessar os 5 saquinhos) |
 | **`[ESPAÇO]`** | Na tela de resultado | **Limpa a tela** e prepara para o próximo competidor da fila |
-| **`[O]`** | A qualquer momento | **Abre o Painel do Operador** para cadastrar ou escolher jogadores |
+| **`[O]`** | A qualquer momento | **Abre o Painel do Operador** para cadastrar ou escolher competidores da fila |
+| **`[Ctrl]`** ou **`[F2]`** | A qualquer momento | **Painel Oculto de Diagnóstico dos Sensores (HUD)** para telemetria e teste de bancada |
+| **`[V]`** | A qualquer momento | **Exibe/Oculta a barra de atalhos e simulação** no rodapé (inicia oculta) |
 | **`[1]`** | Durante a rodada | *(Simulador)* Caso 1: **Buraco Pequeno (+8 pts)** |
 | **`[2]`** | Durante a rodada | *(Simulador)* Caso 2: **Buraco Médio (+6 pts)** |
 | **`[3]`** | Durante a rodada | *(Simulador)* Caso 3: **Buraco Grande (+4 pts)** |
 | **`[P]`** | Durante a rodada | *(Simulador)* Caso 4: **Prancha (0 pt)** |
 | **`[F]`** | Durante a rodada | *(Simulador)* Caso 5: **Fora (-4 pts)** |
 | **`[R]`** | A qualquer momento | Reseta o display para a tela de espera |
+| **`[Esc]`** | A qualquer momento | Fecha qualquer modal aberto (Operador, Diagnóstico ou barra de atalhos) |
 
 ---
 
-## 📊 Visualização de Dados e Planilhas no Back-end
+## 🛡️ Segurança de Dados, Backups e Exportação
 
-Você não precisa abrir a web para auditar ou ver os resultados:
+Para garantir integridade durante eventos escolares, feiras científicas ou torneios públicos, o sistema conta com uma suíte completa de segurança (disponível tanto via CLI quanto na interface gráfica do Operador **`[O]`**):
 
+### 1. Operações via Interface Gráfica (Modal do Operador `[O]`)
+* 💾 **Salvar Backup:** Salva um snapshot binário instantâneo de todas as tabelas na pasta `database/backups/`;
+* 📥 **Restaurar:** Restaura o estado das partidas a partir do backup mais recente (proteção contra quedas de energia);
+* 📊 **Exportar CSV:** Gera e baixa diretamente no navegador a planilha `ranking.csv`;
+* 🗑️ **Zerar Banco de Dados:** Limpa as tabelas de partidas e arremessos para iniciar um novo evento, exigindo a senha de administrador (**`admin`**) e gerando um backup de segurança automático antes do wipe.
+
+### 2. Operações via Terminal (Script CLI)
 * **Ver tabelas formatadas no terminal:**
   ```bash
   ./database/manage_db.sh ver
+  ```
+* **Gerar backup físico manual:**
+  ```bash
+  ./database/manage_db.sh backup
+  ```
+* **Restaurar a partir do último backup:**
+  ```bash
+  ./database/manage_db.sh restaurar
+  ```
+* **Zerar banco para novo torneio:**
+  ```bash
+  ./database/manage_db.sh zerar
   ```
 * **Exportar para arquivos Excel / Calc (`.csv`):**
   ```bash
