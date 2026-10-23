@@ -109,6 +109,7 @@ def tratar_mensagem_serial(mensagem: str) -> None:
                 serial_handler.enviar_comando_arduino(f"ACERTO_{pts}")
                 if game_manager.estado == EstadosJogo.FINALIZADA:
                     serial_handler.enviar_comando_arduino("GAME_OVER")
+                broadcast_telemetria()
                 return
         except Exception as e:
             logging.warning(f"[Serial Router] Erro ao decodificar JSON do Arduino ('{texto}'): {e}")
@@ -137,6 +138,20 @@ def tratar_mensagem_serial(mensagem: str) -> None:
     elif msg in ("RESET", "CANCELAR"):
         game_manager.resetar_para_espera()
         serial_handler.enviar_comando_arduino("LEDS_OFF")
+
+    broadcast_telemetria()
+
+
+def broadcast_telemetria() -> None:
+    """
+    Envia o snapshot atual de telemetria dos sensores e do Arduino para todos os clientes conectados.
+    """
+    broadcast_evento_threadsafe({
+        "tipo": "TELEMETRIA_ATUALIZADA",
+        "serial": serial_handler.obter_telemetria(),
+        "sensores": game_manager.stats_sensores,
+        "banco": {"conectado": True, "socket": db.PG_RUN}
+    })
 
 
 # Inicializa o leitor da porta USB com o Arduino
@@ -367,6 +382,7 @@ async def websocket_handler(websocket, path):
     try:
         # Envia o estado completo assim que o navegador se conecta
         estado_inicial = game_manager.obter_estado_atual()
+        estado_inicial["telemetria_serial"] = serial_handler.obter_telemetria()
         await websocket.send(json.dumps(estado_inicial))
 
         # Loop de escuta: fica aguardando mensagens enviadas pelo JavaScript do navegador
@@ -436,7 +452,18 @@ async def websocket_handler(websocket, path):
                     serial_handler.enviar_comando_arduino("LEDS_OFF")
 
                 elif tipo == "OBTER_ESTADO":
-                    await websocket.send(json.dumps(game_manager.obter_estado_atual()))
+                    estado = game_manager.obter_estado_atual()
+                    estado["telemetria_serial"] = serial_handler.obter_telemetria()
+                    await websocket.send(json.dumps(estado))
+
+                # 6.1 Telemetria e diagnóstico em tempo real dos sensores e hardware
+                elif tipo == "OBTER_TELEMETRIA":
+                    await websocket.send(json.dumps({
+                        "tipo": "TELEMETRIA_ATUALIZADA",
+                        "serial": serial_handler.obter_telemetria(),
+                        "sensores": game_manager.stats_sensores,
+                        "banco": {"conectado": True, "socket": db.PG_RUN}
+                    }))
 
                 # 7. Consulta de Ranking filtrado por turma/grupo ou geral
                 elif tipo == "OBTER_RANKING":

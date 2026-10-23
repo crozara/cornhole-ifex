@@ -56,6 +56,12 @@ class SerialHandler:
         # Indica se estamos no modo simulador (quando não há placa física plugada)
         self.modo_simulador = True
 
+        # Telemetria e diagnóstico em tempo real
+        self.ultima_linha: str = ""
+        self.ultimo_ts: Optional[float] = None
+        self.total_leituras: int = 0
+        self.historico_telemetria: list = []
+
     def encontrar_porta_arduino(self) -> Optional[str]:
         """
         Varre o sistema operacional procurando onde o Arduino foi plugado.
@@ -145,8 +151,20 @@ class SerialHandler:
                     # Lê uma linha enviada pelo Arduino (ex: '{"evento":"acerto","buraco":"pequeno","pontos":8}\n')
                     linha = self.conexao.readline().decode("utf-8", errors="ignore").strip()
                     
-                    # Se chegou uma mensagem válida, encaminha para o jogo
+                    # Se chegou uma mensagem válida, registra a telemetria e encaminha para o jogo
                     if linha:
+                        agora_ts = time.time()
+                        self.ultima_linha = linha
+                        self.ultimo_ts = agora_ts
+                        self.total_leituras += 1
+                        self.historico_telemetria.append({
+                            "timestamp": agora_ts,
+                            "linha": linha,
+                            "origem": "hardware"
+                        })
+                        if len(self.historico_telemetria) > 20:
+                            self.historico_telemetria.pop(0)
+
                         logging.info(f"[Serial Recebido] -> '{linha}'")
                         self.callback_mensagem(linha)
 
@@ -181,5 +199,32 @@ class SerialHandler:
         Permite disparar um evento (JSON ou texto do sensor) usando
         as teclas do teclado sem precisar do Arduino físico conectado.
         """
+        agora_ts = time.time()
+        self.ultima_linha = mensagem
+        self.ultimo_ts = agora_ts
+        self.total_leituras += 1
+        self.historico_telemetria.append({
+            "timestamp": agora_ts,
+            "linha": mensagem,
+            "origem": "simulador"
+        })
+        if len(self.historico_telemetria) > 20:
+            self.historico_telemetria.pop(0)
+
         logging.info(f"[Simulador Entrada] -> '{mensagem}'")
         self.callback_mensagem(mensagem)
+
+    def obter_telemetria(self) -> dict:
+        """
+        Retorna o estado técnico atual da comunicação serial e do hardware Arduino.
+        """
+        return {
+            "conectado": not self.modo_simulador and self.conexao is not None and getattr(self.conexao, "is_open", False),
+            "porta": self.porta_ativa if not self.modo_simulador else "Simulador Teclado",
+            "modo_simulador": self.modo_simulador,
+            "baudrate": self.baudrate,
+            "total_leituras": self.total_leituras,
+            "ultima_linha": self.ultima_linha,
+            "ultimo_ts": self.ultimo_ts,
+            "historico": self.historico_telemetria[-10:]
+        }

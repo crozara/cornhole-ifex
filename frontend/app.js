@@ -79,7 +79,28 @@ const dom = {
     btnExportarCsv: document.getElementById('btnExportarCsv'),   // Botão para baixar planilhas CSV
     btnZerarBanco: document.getElementById('btnZerarBanco'),     // Botão perigoso para zerar banco com senha
     securityFeedback: document.getElementById('securityFeedback'), // Feedback visual de segurança
-    backupNoticeLabel: document.getElementById('backupNoticeLabel') // Rótulo de status de backup
+    backupNoticeLabel: document.getElementById('backupNoticeLabel'), // Rótulo de status de backup
+
+    // Painel Oculto de Telemetria e Diagnóstico de Sensores (HUD Técnico)
+    diagnosticModal: document.getElementById('diagnosticModal'),
+    btnCloseDiagnostic: document.getElementById('btnCloseDiagnostic'),
+    diagSerialDot: document.getElementById('diagSerialDot'),
+    diagSerialPort: document.getElementById('diagSerialPort'),
+    diagWsDot: document.getElementById('diagWsDot'),
+    diagWsStatus: document.getElementById('diagWsStatus'),
+    diagDbStatus: document.getElementById('diagDbStatus'),
+    diagTotalLeituras: document.getElementById('diagTotalLeituras'),
+    diagCountPequeno: document.getElementById('diagCountPequeno'),
+    diagLastPequeno: document.getElementById('diagLastPequeno'),
+    diagCountMedio: document.getElementById('diagCountMedio'),
+    diagLastMedio: document.getElementById('diagLastMedio'),
+    diagCountGrande: document.getElementById('diagCountGrande'),
+    diagLastGrande: document.getElementById('diagLastGrande'),
+    diagTerminalLog: document.getElementById('diagTerminalLog'),
+    diagTerminalTime: document.getElementById('diagTerminalTime'),
+    btnTestPequeno: document.getElementById('btnTestPequeno'),
+    btnTestMedio: document.getElementById('btnTestMedio'),
+    btnTestGrande: document.getElementById('btnTestGrande')
 };
 
 // -----------------------------------------------------------------------------
@@ -415,9 +436,125 @@ function setRankingFilter(grupo) {
     }
 }
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/**
+ * Alterna a exibição do Painel Oculto de Diagnóstico dos Sensores (HUD Técnico)
+ */
+function toggleDiagnosticModal(force) {
+    if (!dom.diagnosticModal) return;
+    const shouldOpen = force !== undefined ? force : !dom.diagnosticModal.classList.contains('active');
+    if (shouldOpen) {
+        dom.diagnosticModal.classList.add('active');
+        sendWs({ tipo: "OBTER_TELEMETRIA" });
+    } else {
+        dom.diagnosticModal.classList.remove('active');
+    }
+}
+
+// Listeners dos controles do Painel de Diagnóstico
+if (dom.btnCloseDiagnostic) {
+    dom.btnCloseDiagnostic.addEventListener('click', () => toggleDiagnosticModal(false));
+}
+if (dom.diagnosticModal) {
+    dom.diagnosticModal.addEventListener('click', (e) => {
+        if (e.target === dom.diagnosticModal) toggleDiagnosticModal(false);
+    });
+}
+if (dom.btnTestPequeno) {
+    dom.btnTestPequeno.addEventListener('click', () => simularCasoArremesso("pequeno", PONTOS_PEQUENO));
+}
+if (dom.btnTestMedio) {
+    dom.btnTestMedio.addEventListener('click', () => simularCasoArremesso("medio", PONTOS_MEDIO));
+}
+if (dom.btnTestGrande) {
+    dom.btnTestGrande.addEventListener('click', () => simularCasoArremesso("grande", PONTOS_GRANDE));
+}
+
+/**
+ * Atualiza os mostradores e feed do painel de diagnóstico
+ */
+function updateTelemetryUI(telemetria) {
+    if (!telemetria) return;
+
+    // 1. Status Serial / Arduino
+    if (telemetria.serial) {
+        const s = telemetria.serial;
+        if (dom.diagSerialPort) {
+            dom.diagSerialPort.textContent = s.modo_simulador 
+                ? "🕹️ MODO SIMULADOR" 
+                : (s.conectado ? `🔌 ${s.porta} (${s.baudrate} bps)` : `⚠️ ${s.porta} (Desconectado)`);
+        }
+        if (dom.diagSerialDot) {
+            dom.diagSerialDot.className = "status-pulse-dot " + (s.conectado ? "online" : (s.modo_simulador ? "sim" : "offline"));
+        }
+        if (dom.diagTotalLeituras) {
+            dom.diagTotalLeituras.textContent = s.total_leituras || 0;
+        }
+
+        // Feed de telemetria serial
+        if (dom.diagTerminalLog && s.historico && s.historico.length > 0) {
+            dom.diagTerminalLog.innerHTML = s.historico.map(h => {
+                const hora = new Date(h.timestamp * 1000).toLocaleTimeString();
+                const cls = h.origem === 'simulador' ? 'diag-log-line sim' : 'diag-log-line';
+                return `<div class="${cls}">[${hora}] [${(h.origem || 'SYS').toUpperCase()}] ${escapeHtml(h.linha)}</div>`;
+            }).join('');
+            dom.diagTerminalLog.scrollTop = dom.diagTerminalLog.scrollHeight;
+        }
+    }
+
+    // 2. Estatísticas dos Sensores
+    if (telemetria.sensores) {
+        const sens = telemetria.sensores;
+        if (sens.PEQUENO) {
+            if (dom.diagCountPequeno) dom.diagCountPequeno.textContent = sens.PEQUENO.total || 0;
+            if (dom.diagLastPequeno) {
+                dom.diagLastPequeno.textContent = sens.PEQUENO.ultimo_ts 
+                    ? new Date(sens.PEQUENO.ultimo_ts * 1000).toLocaleTimeString() 
+                    : "Nenhum";
+            }
+        }
+        if (sens.MEDIO) {
+            if (dom.diagCountMedio) dom.diagCountMedio.textContent = sens.MEDIO.total || 0;
+            if (dom.diagLastMedio) {
+                dom.diagLastMedio.textContent = sens.MEDIO.ultimo_ts 
+                    ? new Date(sens.MEDIO.ultimo_ts * 1000).toLocaleTimeString() 
+                    : "Nenhum";
+            }
+        }
+        if (sens.GRANDE) {
+            if (dom.diagCountGrande) dom.diagCountGrande.textContent = sens.GRANDE.total || 0;
+            if (dom.diagLastGrande) {
+                dom.diagLastGrande.textContent = sens.GRANDE.ultimo_ts 
+                    ? new Date(sens.GRANDE.ultimo_ts * 1000).toLocaleTimeString() 
+                    : "Nenhum";
+            }
+        }
+    }
+
+    if (dom.diagTerminalTime) {
+        dom.diagTerminalTime.textContent = new Date().toLocaleTimeString();
+    }
+}
+
 function applyState(data) {
     currentState = data.estado || currentState;
     activeMatchId = data.partida_id || activeMatchId;
+
+    // Atualiza telemetria se presente no estado
+    if (data.telemetria_serial || data.stats_sensores) {
+        updateTelemetryUI({
+            serial: data.telemetria_serial,
+            sensores: data.stats_sensores
+        });
+    }
 
     // Atualiza nome do competidor
     if (data.jogador_atual) {
@@ -534,6 +671,8 @@ function connectWebSocket() {
     ws.onopen = () => {
         dom.wsStatus.textContent = "ONLINE (TEMPO REAL)";
         dom.wsDot.className = "connection-dot online";
+        if (dom.diagWsStatus) dom.diagWsStatus.textContent = "ONLINE (60 FPS)";
+        if (dom.diagWsDot) dom.diagWsDot.className = "status-pulse-dot online";
     };
 
     // Mensagens recebidas do servidor Python
@@ -704,6 +843,10 @@ function connectWebSocket() {
                 showSecurityFeedback(msg.mensagem, msg.sucesso ? "var(--neon-green)" : "var(--neon-red)");
                 if (msg.sucesso && window.arcadeAudio) window.arcadeAudio.playStart();
             }
+            // 11. Telemetria e Diagnóstico dos Sensores em Tempo Real
+            else if (msg.tipo === "TELEMETRIA_ATUALIZADA") {
+                updateTelemetryUI(msg);
+            }
         } catch (e) {
             console.error("Erro ao tratar mensagem WebSocket:", e);
         }
@@ -713,6 +856,8 @@ function connectWebSocket() {
     ws.onclose = () => {
         dom.wsStatus.textContent = "DESCONECTADO (TENTANDO EM 2s...)";
         dom.wsDot.className = "connection-dot";
+        if (dom.diagWsStatus) dom.diagWsStatus.textContent = "RECONECTANDO...";
+        if (dom.diagWsDot) dom.diagWsDot.className = "status-pulse-dot offline";
         if (!reconnectTimeout) {
             reconnectTimeout = setTimeout(connectWebSocket, 2000);
         }
@@ -924,9 +1069,23 @@ if (dom.btnZerarBanco) {
 // 8. Atalhos de Teclado Universais do Fliperama
 // -----------------------------------------------------------------------------
 window.addEventListener('keydown', (e) => {
+    // Tecla CTRL ou F2: Atalho secreto para abrir/fechar o Painel Técnico de Sensores
+    if (!e.repeat && (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight' || e.key === 'F2')) {
+        if (!dom.operatorModal || !dom.operatorModal.classList.contains('active')) {
+            toggleDiagnosticModal();
+            return;
+        }
+    }
+
+    // Tecla ESC: Fecha qualquer janela/modal aberto
+    if (e.key === 'Escape') {
+        toggleOperatorModal(false);
+        toggleDiagnosticModal(false);
+        return;
+    }
+
     // Se o operador estiver digitando no modal, não intercepta as teclas do jogo
-    if (dom.operatorModal.classList.contains('active')) {
-        if (e.key === 'Escape') toggleOperatorModal(false);
+    if (dom.operatorModal && dom.operatorModal.classList.contains('active')) {
         return;
     }
 
@@ -979,11 +1138,6 @@ window.addEventListener('keydown', (e) => {
     else if (e.key.toLowerCase() === 'r') {
         e.preventDefault();
         sendWs({ tipo: "RESET_ESPERA" });
-    }
-
-    // Tecla ESC: Fecha qualquer janela aberta
-    else if (e.key === 'Escape') {
-        toggleOperatorModal(false);
     }
 });
 

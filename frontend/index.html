@@ -157,7 +157,7 @@
          ======================================================================= -->
     <footer>
         <div class="shortcuts-hint">
-            <strong>ATALHOS:</strong> [ESPAÇO] Iniciar/Parar &nbsp;|&nbsp; [1] Pequeno &nbsp;|&nbsp; [2] Médio &nbsp;|&nbsp; [3] Grande &nbsp;|&nbsp; [P] Prancha &nbsp;|&nbsp; [F] Fora &nbsp;|&nbsp; [O] Operador &nbsp;|&nbsp; [R] Reset
+            <strong>ATALHOS:</strong> [ESPAÇO] Iniciar/Parar &nbsp;|&nbsp; [1] Pequeno &nbsp;|&nbsp; [2] Médio &nbsp;|&nbsp; [3] Grande &nbsp;|&nbsp; [P] Prancha &nbsp;|&nbsp; [F] Fora &nbsp;|&nbsp; [O] Operador &nbsp;|&nbsp; [Ctrl] Sensores &nbsp;|&nbsp; [R] Reset
         </div>
         <!-- Botões de Simulação dos 5 Casos (atualizados pelas constantes em app.js) -->
         <div class="sim-buttons">
@@ -260,11 +260,139 @@
     </div>
 
     <!-- =======================================================================
-         5. IMPORTAÇÃO DOS SCRIPTS JAVASCRIPT
+         6. MODAL OCULTO DE TELEMETRIA E DIAGNÓSTICO DOS SENSORES (HUD TÉCNICO)
+         Ativado pela tecla [Ctrl] ou [F2] — invisível ao público
+         ======================================================================= -->
+    <div class="modal-overlay diagnostic-overlay" id="diagnosticModal">
+        <div class="diagnostic-content">
+            <div class="diagnostic-header">
+                <div class="diagnostic-title">
+                    <span class="diagnostic-icon">🛠️</span>
+                    <div>
+                        <h3>TELEMETRIA & DIAGNÓSTICO DOS SENSORES</h3>
+                        <span class="diagnostic-sub">PAINEL DE ENGENHARIA IFEx 2026 • ATALHO: [CTRL] OU [F2]</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btnCloseDiagnostic">&times;</button>
+            </div>
+
+            <!-- Grid de Status de Conexões Principais -->
+            <div class="diag-hardware-bar">
+                <div class="diag-hw-card">
+                    <span class="diag-hw-label">ARDUINO / SERIAL</span>
+                    <div class="diag-hw-val">
+                        <span class="status-pulse-dot" id="diagSerialDot"></span>
+                        <span id="diagSerialPort">Aguardando...</span>
+                    </div>
+                </div>
+                <div class="diag-hw-card">
+                    <span class="diag-hw-label">WEBSOCKET CLIENT</span>
+                    <div class="diag-hw-val">
+                        <span class="status-pulse-dot online" id="diagWsDot"></span>
+                        <span id="diagWsStatus">ONLINE (60 FPS)</span>
+                    </div>
+                </div>
+                <div class="diag-hw-card">
+                    <span class="diag-hw-label">BANCO POSTGRESQL</span>
+                    <div class="diag-hw-val">
+                        <span class="status-pulse-dot online"></span>
+                        <span id="diagDbStatus">ATIVO (.pgrun)</span>
+                    </div>
+                </div>
+                <div class="diag-hw-card">
+                    <span class="diag-hw-label">TOTAL LEITURAS SERIAL</span>
+                    <div class="diag-hw-val" id="diagTotalLeituras">0</div>
+                </div>
+            </div>
+
+            <!-- Grade de Monitoramento dos Sensores da Mesa Física -->
+            <div class="diag-sensors-grid">
+                <!-- Sensor 1: Buraco Pequeno (Laser VL53L0X) -->
+                <div class="diag-sensor-card sensor-pequeno">
+                    <div class="diag-sensor-header">
+                        <span class="diag-sensor-badge" style="color: var(--neon-pink);">🔴 BURACO PEQUENO</span>
+                        <span class="diag-sensor-pts">+8 PTS</span>
+                    </div>
+                    <div class="diag-sensor-info">
+                        <strong>Sensor:</strong> Laser ToF VL53L0X<br>
+                        <strong>Pinagem:</strong> I2C (SDA / SCL)<br>
+                        <strong>Critério:</strong> Distância &lt; 100mm<br>
+                        <strong>Cooldown:</strong> 2.000 ms
+                    </div>
+                    <div class="diag-sensor-stat">
+                        <span>Total de Acertos:</span>
+                        <strong id="diagCountPequeno">0</strong>
+                    </div>
+                    <div class="diag-sensor-last">
+                        Último disparo: <span id="diagLastPequeno">Nenhum</span>
+                    </div>
+                    <button class="btn-diag-test" id="btnTestPequeno">TESTAR DISPARO (+8)</button>
+                </div>
+
+                <!-- Sensor 2: Buraco Médio (Ultrassom HC-SR04) -->
+                <div class="diag-sensor-card sensor-medio">
+                    <div class="diag-sensor-header">
+                        <span class="diag-sensor-badge" style="color: var(--neon-yellow);">🟡 BURACO MÉDIO</span>
+                        <span class="diag-sensor-pts">+6 PTS</span>
+                    </div>
+                    <div class="diag-sensor-info">
+                        <strong>Sensor:</strong> Ultrassônico HC-SR04<br>
+                        <strong>Pinagem:</strong> Trig 5 / Echo 6<br>
+                        <strong>Critério:</strong> Distância &lt; 15cm<br>
+                        <strong>Cooldown:</strong> 2.000 ms
+                    </div>
+                    <div class="diag-sensor-stat">
+                        <span>Total de Acertos:</span>
+                        <strong id="diagCountMedio">0</strong>
+                    </div>
+                    <div class="diag-sensor-last">
+                        Último disparo: <span id="diagLastMedio">Nenhum</span>
+                    </div>
+                    <button class="btn-diag-test" id="btnTestMedio">TESTAR DISPARO (+6)</button>
+                </div>
+
+                <!-- Sensor 3: Buraco Grande (Célula de Carga HX711) -->
+                <div class="diag-sensor-card sensor-grande">
+                    <div class="diag-sensor-header">
+                        <span class="diag-sensor-badge" style="color: var(--neon-green);">🟢 BURACO GRANDE</span>
+                        <span class="diag-sensor-pts">+4 PTS</span>
+                    </div>
+                    <div class="diag-sensor-info">
+                        <strong>Sensor:</strong> Célula de Carga HX711<br>
+                        <strong>Pinagem:</strong> DOUT 3 / SCK 2<br>
+                        <strong>Critério:</strong> Peso &gt; 100g<br>
+                        <strong>Cooldown:</strong> 2.000 ms
+                    </div>
+                    <div class="diag-sensor-stat">
+                        <span>Total de Acertos:</span>
+                        <strong id="diagCountGrande">0</strong>
+                    </div>
+                    <div class="diag-sensor-last">
+                        Último disparo: <span id="diagLastGrande">Nenhum</span>
+                    </div>
+                    <button class="btn-diag-test" id="btnTestGrande">TESTAR DISPARO (+4)</button>
+                </div>
+            </div>
+
+            <!-- Terminal de Telemetria Serial em Tempo Real -->
+            <div class="diag-terminal-box">
+                <div class="diag-terminal-header">
+                    <span>📟 FEED SERIAL EM TEMPO REAL (ÚLTIMOS PACOTES DO ARDUINO)</span>
+                    <span id="diagTerminalTime" style="color: var(--neon-cyan);">Ao vivo</span>
+                </div>
+                <div class="diag-terminal-log" id="diagTerminalLog">
+                    <div class="diag-log-line dim">Aguardando dados da porta serial...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         7. IMPORTAÇÃO DOS SCRIPTS JAVASCRIPT
          - audio.js: sintetizador Web Audio API de 8-bit
          - app.js: motor de conexão WebSocket, cronômetro e atalhos de teclado
          ======================================================================= -->
-    <script src="/audio.js?v=20261022_01"></script>
-    <script src="/app.js?v=20261022_01"></script>
+    <script src="/audio.js?v=20261023_01"></script>
+    <script src="/app.js?v=20261023_01"></script>
 </body>
 </html>

@@ -84,6 +84,15 @@ class GameManager:
         # Guarda o resumo da última partida concluída para exibição
         self.ultimo_resultado: Optional[Dict[str, Any]] = None
 
+        # Estatísticas e telemetria de sensores em tempo real (HUD Técnico)
+        self.stats_sensores: Dict[str, Dict[str, Any]] = {
+            "PEQUENO": {"total": 0, "ultimo_ts": None, "nome": "Laser VL53L0X (Pequeno)", "pinos": "I2C (SDA/SCL)", "pontos": PONTOS_PADRAO_SENSORES.get("PEQUENO", 8)},
+            "MEDIO": {"total": 0, "ultimo_ts": None, "nome": "Ultrassônico HC-SR04 (Médio)", "pinos": "Trig 5 / Echo 6", "pontos": PONTOS_PADRAO_SENSORES.get("MEDIO", 6)},
+            "GRANDE": {"total": 0, "ultimo_ts": None, "nome": "Célula Carga HX711 (Grande)", "pinos": "DOUT 3 / SCK 2", "pontos": PONTOS_PADRAO_SENSORES.get("GRANDE", 4)},
+            "PRANCHA": {"total": 0, "ultimo_ts": None, "nome": "Prancha", "pinos": "Mesa", "pontos": PONTOS_PADRAO_SENSORES.get("PRANCHA", 0)},
+            "FORA": {"total": 0, "ultimo_ts": None, "nome": "Fora", "pinos": "Solo", "pontos": PONTOS_PADRAO_SENSORES.get("FORA", -4)},
+        }
+
     def _notificar(self, payload: Dict[str, Any]) -> None:
         """
         Dispara uma notificação para o servidor web enviar via WebSocket
@@ -229,6 +238,13 @@ class GameManager:
         # Atualiza as variáveis em memória
         pontos_saquinho = int(arremesso_db.get("pontos", pontos_informados))
         self.pontuacao_atual += pontos_saquinho
+
+        # Atualiza a telemetria do sensor
+        chave_sensor = "PEQUENO" if codigo == "BURACO" else codigo
+        if chave_sensor in self.stats_sensores:
+            self.stats_sensores[chave_sensor]["total"] += 1
+            self.stats_sensores[chave_sensor]["ultimo_ts"] = time.time()
+
         info_saquinho = {
             "numero": num_saquinho,
             "sensor": codigo,
@@ -372,5 +388,17 @@ class GameManager:
             "ranking": db.obter_ranking_global(10),
             "grupos": db.listar_grupos(),
             "jogadores_cadastrados": db.listar_jogadores(),
-            "sensores": db.listar_sensores()
+            "sensores": db.listar_sensores(),
+            "stats_sensores": self.stats_sensores
+        }
+
+    def obter_telemetria_sensores(self) -> Dict[str, Any]:
+        """
+        Retorna o relatório completo de telemetria e estado de todos os sensores.
+        """
+        return {
+            "tipo": "TELEMETRIA_SENSORES",
+            "stats": self.stats_sensores,
+            "saquinhos_rodada": len(self.saquinhos),
+            "estado": self.estado
         }
