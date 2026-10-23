@@ -26,6 +26,11 @@ const int LIMIAR_LASER_MM   = 100; // Dispara se algo passar a menos de 100mm
 const int LIMIAR_SONAR_CM   = 15;  // Dispara se algo passar a menos de 15cm
 const float LIMIAR_PESO_G   = 100.0; // Peso mínimo para registrar (sacos costumam ter ~400g)
 
+// --- Constantes de Pontuação ---
+const int pontosPequeno = 8;
+const int pontosMedio   = 6;
+const int pontosGrande  = 4;
+
 // --- Variáveis de Controle (Debounce/Cooldown e Tempo de Retirada) ---
 // Evita que a mesma sacola registre vários pontos enquanto atravessa o buraco ou é retirada
 float tempoDeEspera = 3.0;          // Tempo de espera em segundos após retirar o objeto
@@ -84,13 +89,13 @@ void loop() {
       // Computa o ponto apenas quando o sistema estava livre (sem objeto e fora do tempo de espera)
       if (detectouPequeno) {
         buraco = "pequeno";
-        pontuacao = 50;
+        pontuacao = pontosPequeno;
       } else if (detectouMedio) {
         buraco = "medio";
-        pontuacao = 30;
+        pontuacao = pontosMedio;
       } else if (detectouGrande) {
         buraco = "grande";
-        pontuacao = 10;
+        pontuacao = pontosGrande;
         
         // Se os sacos caírem em uma rede e ficarem acumulados, 
         // comente a linha abaixo. Se eles caírem no chão e a balança esvaziar, 
@@ -136,7 +141,7 @@ void enviarParaPython(String nomeBuraco, int pontos) {
   doc["pontos"] = pontos;
   
   // Envia pela porta Serial. Vai imprimir algo como: 
-  // {"evento":"acerto","buraco":"pequeno","pontos":50}
+  // {"evento":"acerto","buraco":"pequeno","pontos":8}
   serializeJson(doc, Serial);
   Serial.println(); // O '\n' final é vital para o Python usar .readline()
 }

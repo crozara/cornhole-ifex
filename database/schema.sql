@@ -5,7 +5,7 @@
 -- =============================================================================
 -- Este arquivo define como os dados são guardados no PostgreSQL 16:
 -- 1. jogadores: quem está competindo (nome, turma/curso).
--- 2. sensores: regras de pontuação (Buraco = 3, Prancha = 1, Fora = 0).
+-- 2. sensores: regras de pontuação (Pequeno = 8, Médio = 6, Grande = 4, Fora = 0).
 -- 3. partidas: cada rodada jogada, seu tempo total e status.
 -- 4. arremessos: o detalhe lance a lance dos 5 saquinhos jogados na rodada.
 -- =============================================================================
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS jogadores (
 -- -----------------------------------------------------------------------------
 -- Permite mudar a pontuação ou adicionar novos sensores sem precisar alterar código!
 CREATE TABLE IF NOT EXISTS sensores (
-    codigo VARCHAR(30) PRIMARY KEY,                 -- Código de texto que vem do Arduino (ex: 'BURACO', 'PRANCHA')
+    codigo VARCHAR(30) PRIMARY KEY,                 -- Código de texto que vem do Arduino (ex: 'PEQUENO', 'MEDIO', 'GRANDE')
     pontos INT NOT NULL CHECK (pontos >= 0),        -- Quantos pontos esse acerto vale (não pode ser negativo)
     descricao VARCHAR(100),                         -- Explicação humana do sensor
     ativo BOOLEAN NOT NULL DEFAULT TRUE             -- Permite desativar um sensor sem deletar o histórico
@@ -33,8 +33,11 @@ CREATE TABLE IF NOT EXISTS sensores (
 
 -- Inserção segura das regras oficiais (não duplica nem apaga no reinício)
 INSERT INTO sensores (codigo, pontos, descricao) VALUES
-    ('BURACO', 3, 'Acerto direto na caçapa/buraco do Cornhole (3 pontos)'),
-    ('PRANCHA', 1, 'Saquinho permaneceu sobre a prancha (1 ponto)'),
+    ('PEQUENO', 8, 'Acerto no buraco pequeno - Sensor Laser VL53L0X (8 pontos)'),
+    ('MEDIO', 6, 'Acerto no buraco médio - Sensor Ultrassônico HC-SR04 (6 pontos)'),
+    ('GRANDE', 4, 'Acerto no buraco grande - Célula de Carga HX711 (4 pontos)'),
+    ('BURACO', 8, 'Acerto direto na caçapa/buraco do Cornhole (8 pontos)'),
+    ('PRANCHA', 4, 'Saquinho permaneceu sobre a prancha / buraco grande (4 pontos)'),
     ('FORA', 0, 'Saquinho fora da prancha / errou o alvo (0 pontos)')
 ON CONFLICT (codigo) DO UPDATE 
 SET pontos = EXCLUDED.pontos, descricao = EXCLUDED.descricao;
@@ -68,7 +71,7 @@ CREATE TABLE IF NOT EXISTS arremessos (
     partida_id INT NOT NULL REFERENCES partidas(id) ON DELETE CASCADE, -- Qual partida esse arremesso pertence
     numero_saquinho INT NOT NULL CHECK (numero_saquinho BETWEEN 1 AND 5), -- Número do saquinho (1 ao 5)
     sensor_codigo VARCHAR(30) NOT NULL REFERENCES sensores(codigo),      -- Onde o saquinho caiu
-    pontos INT NOT NULL CHECK (pontos >= 0),        -- Pontos gerados (preenchido automaticamente pela Trigger)
+    pontos INT NOT NULL CHECK (pontos >= 0),        -- Pontos gerados (preenchido pelo Arduino ou pela Trigger)
     tempo_parcial_ms INT CHECK (tempo_parcial_ms IS NULL OR tempo_parcial_ms >= 0), -- Tempo do arremesso
     registrado_em TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

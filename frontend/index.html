@@ -7,7 +7,7 @@
     <title>Cornhole Inteligente - IFEx</title>
     
     <!-- Folha de Estilos Neon Cyberpunk Retrô -->
-    <link rel="stylesheet" href="/style.css?v=20261021_04">
+    <link rel="stylesheet" href="/style.css?v=20261022_01">
 </head>
 <body>
 
@@ -159,17 +159,18 @@
         <div class="shortcuts-hint">
             <strong>ATALHOS:</strong> [ESPAÇO] Iniciar e Finalizar Rodada &nbsp;|&nbsp; [O] Painel do Operador &nbsp;|&nbsp; [R] Resetar Tela
         </div>
-        <!-- Botões de Simulação (apenas no rodapé, como o usuário prefere) -->
+        <!-- Botões de Simulação alinhados às pontuações do main.ino -->
         <div class="sim-buttons">
-            <button class="btn-sim sim-hole" id="btnSimHole">BURACO (+3) [B]</button>
-            <button class="btn-sim sim-board" id="btnSimBoard">PRANCHA (+1) [P]</button>
-            <button class="btn-sim sim-miss" id="btnSimMiss">FORA (0) [F]</button>
+            <button class="btn-sim sim-hole" id="btnSimHole">PEQUENO (+8) [B/1]</button>
+            <button class="btn-sim sim-board" id="btnSimMedio">MÉDIO (+6) [M/2]</button>
+            <button class="btn-sim sim-board" id="btnSimBoard">GRANDE (+4) [P/3]</button>
+            <button class="btn-sim sim-miss" id="btnSimMiss">FORA (0) [F/0]</button>
             <button class="btn-sim" id="btnSimReset">RESET [R]</button>
         </div>
     </footer>
 
-    <!-- Elemento Flutuante para Popups Neon de Pontuação (+3 BURACO! / +1 PRANCHA!) -->
-    <div class="score-popup" id="scorePopup">+3 BURACO!</div>
+    <!-- Elemento Flutuante para Popups Neon de Pontuação (+8 PEQUENO! / +6 MÉDIO! / +4 GRANDE!) -->
+    <div class="score-popup" id="scorePopup">+8 PEQUENO!</div>
 
     <!-- =======================================================================
          4. MODAL DO OPERADOR (CADASTRO E FILA DE JOGADORES)
@@ -262,7 +263,7 @@
          - audio.js: sintetizador Web Audio API de 8-bit
          - app.js: motor de conexão WebSocket, cronômetro e atalhos de teclado
          ======================================================================= -->
-    <script src="/audio.js?v=20261021_04"></script>
-    <script src="/app.js?v=20261021_04"></script>
+    <script src="/audio.js?v=20261022_01"></script>
+    <script src="/app.js?v=20261022_01"></script>
 </body>
 </html>

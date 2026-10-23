@@ -5,9 +5,10 @@ Arquivo: backend/serial_handler.py
 Função: Comunicação com o Hardware (Arduino) via Porta Serial USB
 =============================================================================
 Este arquivo é o "OUVIDO" do nosso sistema. Ele fica escutando a porta USB
-onde o Arduino está conectado. Toda vez que um saquinho cai na prancha ou no
-buraco, o Arduino envia um texto (ex: "BURACO"), e este arquivo recebe essa
-mensagem e a repassa para o motor do jogo.
+onde o Arduino está conectado. Toda vez que um saquinho cai em algum dos
+buracos, o Arduino envia um pacote JSON (ex: {"evento":"acerto","buraco":"pequeno","pontos":8})
+ou um texto simples, e este arquivo recebe essa mensagem e a repassa para o
+motor do jogo.
 
 Se o Arduino NÃO estiver conectado (por exemplo, ao testar no quarto ou na sala),
 ele ativa automaticamente o "Modo Simulador", permitindo jogar usando o teclado.
@@ -28,7 +29,7 @@ class SerialHandler:
     """
     Classe responsável por:
     1. Achar a porta USB onde o Arduino está conectado.
-    2. Ler as mensagens que o Arduino manda em tempo real.
+    2. Ler as mensagens que o Arduino manda em tempo real (JSON ou texto).
     3. Enviar comandos do PC de volta para o Arduino (ex: ligar luzes).
     4. Ativar o modo simulador caso o Arduino não esteja plugado.
     """
@@ -40,7 +41,7 @@ class SerialHandler:
         # Velocidade da comunicação serial (115200 bits por segundo é o padrão rápido do Arduino)
         self.baudrate = baudrate
         
-        # Guarda o nome da porta USB conectada (ex: '/dev/ttyUSB0')
+        # Guarda o nome da porta USB conectada (ex: '/dev/ttyUSB0' ou 'COM3')
         self.porta_ativa: Optional[str] = None
         
         # Objeto da conexão serial com a placa
@@ -57,13 +58,25 @@ class SerialHandler:
 
     def encontrar_porta_arduino(self) -> Optional[str]:
         """
-        Varre o sistema operacional Linux procurando onde o Arduino foi plugado.
+        Varre o sistema operacional procurando onde o Arduino foi plugado.
         No Linux, placas Arduino costumam aparecer como /dev/ttyUSB0 ou /dev/ttyACM0.
+        No Windows, aparecem como COM3, COM4, etc.
         Retorna o caminho da primeira porta encontrada ou None se não achar nenhuma.
         """
         portas = glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*")
         if portas:
             return portas[0]  # Retorna a porta encontrada (ex: '/dev/ttyACM0')
+
+        # Suporte multiplataforma (Windows COM* / macOS / Linux via list_ports)
+        try:
+            from serial.tools import list_ports
+            for p in list_ports.comports():
+                desc = f"{p.device} {p.description or ''} {p.manufacturer or ''}".lower()
+                if any(k in desc for k in ("arduino", "ch340", "cp210", "ftdi", "usb", "acm")):
+                    return p.device
+        except Exception:
+            pass
+
         return None
 
     def iniciar(self) -> None:
@@ -129,7 +142,7 @@ class SerialHandler:
 
                 # Loop de leitura: enquanto estiver conectado, lê o que o Arduino manda
                 while self.rodando:
-                    # Lê uma linha de texto enviada pelo Arduino (ex: "BURACO\n")
+                    # Lê uma linha enviada pelo Arduino (ex: '{"evento":"acerto","buraco":"pequeno","pontos":8}\n')
                     linha = self.conexao.readline().decode("utf-8", errors="ignore").strip()
                     
                     # Se chegou uma mensagem válida, encaminha para o jogo
@@ -165,7 +178,7 @@ class SerialHandler:
     def simular_entrada(self, mensagem: str) -> None:
         """
         Função de teste para o Modo Simulador:
-        Permite disparar um evento (ex: 'BURACO', 'PRANCHA', 'FORA') usando
+        Permite disparar um evento (JSON ou texto do sensor) usando
         as teclas do teclado sem precisar do Arduino físico conectado.
         """
         logging.info(f"[Simulador Entrada] -> '{mensagem}'")

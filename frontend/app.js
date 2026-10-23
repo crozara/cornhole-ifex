@@ -9,7 +9,8 @@
  * 2. Controla o Cronômetro de Precisão a 60 quadros por segundo (60 FPS).
  * 3. Toca os sons nostálgicos 8-bit chamando o 'audio.js'.
  * 4. Renderiza na tela a tabela do Ranking Top 10 com pódio e tempos.
- * 5. Escuta as teclas do teclado ([ESPAÇO], [O], [B], [P], [F]) para jogar.
+ * 5. Recebe e computa as pontuações vindas do main.ino via SerialHandler
+ *    (pontosPequeno = 8, pontosMedio = 6, pontosGrande = 4).
  * =============================================================================
  */
 
@@ -31,7 +32,7 @@ const dom = {
     btnFilterGeral: document.getElementById('btnFilterGeral'), // Aba para ver o Placar Geral
     selectGroupFilter: document.getElementById('selectGroupFilter'), // Menu suspenso para filtrar por Turma/Grupo
     rankingTableBody: document.getElementById('rankingTableBody'), // Corpo da tabela do Ranking Top 10
-    scorePopup: document.getElementById('scorePopup'),         // Efeito flutuante de "+3 BURACO" ou "+1 PRANCHA"
+    scorePopup: document.getElementById('scorePopup'),         // Efeito flutuante de pontuação
     operatorModal: document.getElementById('operatorModal'),   // Janela modal de cadastro do competidor
     btnOpenOperator: document.getElementById('btnOpenOperator'), // Botão superior que abre o painel do operador
     btnCloseModal: document.getElementById('btnCloseModal'),   // Botão 'X' para fechar a janela modal
@@ -47,10 +48,11 @@ const dom = {
     btnActionEspaco: document.getElementById('btnActionEspaco'), // Botão principal de ação arcade (Espaço)
     btnActionIcon: document.getElementById('btnActionIcon'),   // Ícone do botão principal
     btnActionLabel: document.getElementById('btnActionLabel'), // Texto do botão principal
-    btnSimHole: document.getElementById('btnSimHole'),         // Botão de simular buraco
-    btnSimBoard: document.getElementById('btnSimBoard'),       // Botão de simular prancha
-    btnSimMiss: document.getElementById('btnSimMiss'),         // Botão de simular fora
-    btnSimReset: document.getElementById('btnSimReset'),        // Botão de resetar
+    btnSimHole: document.getElementById('btnSimHole'),         // Botão de simular buraco pequeno (+8)
+    btnSimMedio: document.getElementById('btnSimMedio'),       // Botão de simular buraco médio (+6)
+    btnSimBoard: document.getElementById('btnSimBoard'),       // Botão de simular buraco grande (+4)
+    btnSimMiss: document.getElementById('btnSimMiss'),         // Botão de simular fora (0)
+    btnSimReset: document.getElementById('btnSimReset'),       // Botão de resetar
     btnSalvarBackup: document.getElementById('btnSalvarBackup'), // Botão para salvar cópia de segurança
     btnRestaurarBackup: document.getElementById('btnRestaurarBackup'), // Botão para restaurar backup
     btnExportarCsv: document.getElementById('btnExportarCsv'),   // Botão para baixar planilhas CSV
@@ -58,6 +60,11 @@ const dom = {
     securityFeedback: document.getElementById('securityFeedback'), // Feedback visual de segurança
     backupNoticeLabel: document.getElementById('backupNoticeLabel') // Rótulo de status de backup
 };
+
+// Constantes de pontuação espelhadas do main.ino
+const PONTOS_PEQUENO = 8;
+const PONTOS_MEDIO   = 6;
+const PONTOS_GRANDE  = 4;
 
 // -----------------------------------------------------------------------------
 // 2. Variáveis de Estado Interno da Tela
@@ -228,8 +235,23 @@ function showSecurityFeedback(texto, cor = "var(--neon-cyan)") {
 // 5. Atualização da Interface conforme o Estado do Jogo
 // -----------------------------------------------------------------------------
 /**
+ * Resolve quantos pontos um arremesso vale com base no objeto vindo do Back-end / Arduino
+ */
+function obterPontosArremesso(arremesso) {
+    if (!arremesso) return 0;
+    if (arremesso.pontos !== undefined && arremesso.pontos !== null) {
+        return Number(arremesso.pontos);
+    }
+    const sensor = String(arremesso.sensor || arremesso.buraco || '').toUpperCase();
+    if (sensor === 'PEQUENO' || sensor === 'BURACO') return PONTOS_PEQUENO;
+    if (sensor === 'MEDIO' || sensor === 'MÉDIO') return PONTOS_MEDIO;
+    if (sensor === 'GRANDE' || sensor === 'PRANCHA') return PONTOS_GRANDE;
+    return 0;
+}
+
+/**
  * Atualiza o HUD dos 5 saquinhos na tela do fliperama:
- * - Ícone e cor para BURACO (🎯 +3), PRANCHA (🪵 +1), FORA (💨 0)
+ * - Ícone e pontuação exata para PEQUENO (+8), MÉDIO (+6), GRANDE (+4), FORA (0)
  * - Realça o próximo arremesso ativo quando em jogo
  */
 function renderBagSlots(saquinhos = []) {
@@ -258,14 +280,25 @@ function renderBagSlots(saquinhos = []) {
         slot.className = 'hud-pill';
 
         if (arremesso) {
-            if (arremesso.sensor === 'BURACO') {
+            const pts = obterPontosArremesso(arremesso);
+            const sensor = String(arremesso.sensor || arremesso.buraco || '').toUpperCase();
+
+            if (sensor === 'PEQUENO' || sensor === 'BURACO') {
                 slot.classList.add('scored-hole');
                 if (iconEl) iconEl.textContent = '🎯';
-                if (statusEl) statusEl.textContent = '+3 PTS';
-            } else if (arremesso.sensor === 'PRANCHA') {
+                if (statusEl) statusEl.textContent = `+${pts} PTS`;
+            } else if (sensor === 'MEDIO' || sensor === 'MÉDIO') {
+                slot.classList.add('scored-hole');
+                if (iconEl) iconEl.textContent = '🎯';
+                if (statusEl) statusEl.textContent = `+${pts} PTS`;
+            } else if (sensor === 'GRANDE' || sensor === 'PRANCHA') {
                 slot.classList.add('scored-board');
-                if (iconEl) iconEl.textContent = '🪵';
-                if (statusEl) statusEl.textContent = '+1 PTO';
+                if (iconEl) iconEl.textContent = '🎯';
+                if (statusEl) statusEl.textContent = `+${pts} ${pts === 1 ? 'PTO' : 'PTS'}`;
+            } else if (pts > 0) {
+                slot.classList.add('scored-board');
+                if (iconEl) iconEl.textContent = '🎯';
+                if (statusEl) statusEl.textContent = `+${pts} PTS`;
             } else {
                 slot.classList.add('scored-miss');
                 if (iconEl) iconEl.textContent = '💨';
@@ -473,28 +506,41 @@ function connectWebSocket() {
                     saquinhos: []
                 });
             } 
-            // 3. Saquinho pontuou (toca o som correspondente e mostra popup neon)
+            // 3. Saquinho pontuou (recebe os dados do main.ino via SerialHandler, toca som e computa placar)
             else if (msg.tipo === "SAQUINHO_PONTUOU") {
-                if (msg.sensor === 'BURACO') {
+                const sensor = String(msg.sensor || msg.buraco || '').toUpperCase();
+                const pts = obterPontosArremesso(msg);
+
+                if (sensor === 'PEQUENO' || sensor === 'BURACO') {
                     window.arcadeAudio.playHole();
-                    triggerScorePopup("+3 BURACO! 🎯", "#ff0055");
-                } else if (msg.sensor === 'PRANCHA') {
+                    triggerScorePopup(`+${pts} BURACO PEQUENO! 🎯`, "#ff0055");
+                } else if (sensor === 'MEDIO' || sensor === 'MÉDIO') {
+                    window.arcadeAudio.playHole();
+                    triggerScorePopup(`+${pts} BURACO MÉDIO! 🎯`, "#ffe600");
+                } else if (sensor === 'GRANDE' || sensor === 'PRANCHA') {
                     window.arcadeAudio.playBoard();
-                    triggerScorePopup("+1 PRANCHA! 🪵", "#00f0ff");
+                    triggerScorePopup(`+${pts} BURACO GRANDE! 🎯`, "#00f0ff");
+                } else if (pts > 0) {
+                    window.arcadeAudio.playHole();
+                    triggerScorePopup(`+${pts} PONTOS! 🎯`, "#00ff66");
                 } else {
                     window.arcadeAudio.playMiss();
                     triggerScorePopup("FORA! 💨", "#888888");
                 }
 
-                dom.displayScore.textContent = String(msg.pontuacao_total).padStart(2, '0');
-
-                // Adiciona o arremesso ao rack visual
+                // Adiciona o arremesso ao rack visual e computa a pontuação total
                 currentSaquinhos.push({
                     numero: msg.numero_saquinho,
-                    sensor: msg.sensor,
-                    pontos: msg.pontos,
+                    sensor: sensor,
+                    pontos: pts,
                     tempo_parcial_ms: msg.tempo_parcial_ms
                 });
+
+                const totalComputado = (msg.pontuacao_total !== undefined && msg.pontuacao_total !== null)
+                    ? Number(msg.pontuacao_total)
+                    : currentSaquinhos.reduce((acc, s) => acc + obterPontosArremesso(s), 0);
+
+                dom.displayScore.textContent = String(totalComputado).padStart(2, '0');
                 renderBagSlots(currentSaquinhos);
 
                 // TRAVA IMEDIATA NO FRONT-END NO 5º ARREMESSO:
@@ -725,11 +771,22 @@ if (dom.btnActionEspaco) {
     dom.btnActionEspaco.addEventListener('click', () => sendWs({ tipo: "ACAO_ESPACO" }));
 }
 
-// Botões de arremesso e reset do deck arcade
-if (dom.btnSimHole) dom.btnSimHole.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "BURACO" }));
-if (dom.btnSimBoard) dom.btnSimBoard.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "PRANCHA" }));
-if (dom.btnSimMiss) dom.btnSimMiss.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "FORA" }));
-if (dom.btnSimReset) dom.btnSimReset.addEventListener('click', () => sendWs({ tipo: "RESET_ESPERA" }));
+// Botões de arremesso e reset do deck arcade (enviam sensor e pontuação iguais ao main.ino)
+if (dom.btnSimHole) {
+    dom.btnSimHole.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "pequeno", pontos: PONTOS_PEQUENO }));
+}
+if (dom.btnSimMedio) {
+    dom.btnSimMedio.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "medio", pontos: PONTOS_MEDIO }));
+}
+if (dom.btnSimBoard) {
+    dom.btnSimBoard.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "grande", pontos: PONTOS_GRANDE }));
+}
+if (dom.btnSimMiss) {
+    dom.btnSimMiss.addEventListener('click', () => sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "fora", pontos: 0 }));
+}
+if (dom.btnSimReset) {
+    dom.btnSimReset.addEventListener('click', () => sendWs({ tipo: "RESET_ESPERA" }));
+}
 
 // Filtros do Ranking (Aba Geral vs Menu de Turmas)
 if (dom.btnFilterGeral) {
@@ -807,22 +864,28 @@ window.addEventListener('keydown', (e) => {
         sendWs({ tipo: "ACAO_ESPACO" });
     }
 
-    // Tecla B: Simula acerto no BURACO (+3)
-    else if (e.key.toLowerCase() === 'b') {
+    // Tecla B ou 1: Simula acerto no BURACO PEQUENO (+8)
+    else if (e.key.toLowerCase() === 'b' || e.key === '1') {
         e.preventDefault();
-        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "BURACO" });
+        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "pequeno", pontos: PONTOS_PEQUENO });
     }
 
-    // Tecla P: Simula acerto na PRANCHA (+1)
-    else if (e.key.toLowerCase() === 'p') {
+    // Tecla M ou 2: Simula acerto no BURACO MÉDIO (+6)
+    else if (e.key.toLowerCase() === 'm' || e.key === '2') {
         e.preventDefault();
-        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "PRANCHA" });
+        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "medio", pontos: PONTOS_MEDIO });
     }
 
-    // Tecla F: Simula saquinho FORA (0)
-    else if (e.key.toLowerCase() === 'f') {
+    // Tecla P, G ou 3: Simula acerto no BURACO GRANDE (+4)
+    else if (e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 'g' || e.key === '3') {
         e.preventDefault();
-        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "FORA" });
+        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "grande", pontos: PONTOS_GRANDE });
+    }
+
+    // Tecla F ou 0: Simula saquinho FORA (0)
+    else if (e.key.toLowerCase() === 'f' || e.key === '0') {
+        e.preventDefault();
+        sendWs({ tipo: "SIMULAR_ARREMESSO", sensor: "fora", pontos: 0 });
     }
 
     // Tecla O: Abre o Painel do Operador

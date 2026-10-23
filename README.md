@@ -26,8 +26,9 @@ O projeto integra **hardware**, **comunicação serial**, **banco de dados relac
 1. **Cadastro do Jogador:** O operador pressiona a tecla **`[O]`** e cadastra o competidor (nome e turma).
 2. **Início da Rodada:** O jogador se posiciona e aperta a barra de **`[ESPAÇO]`**. O cronômetro gigante dispara e os LEDs acendem.
 3. **Durante os Arremessos:** Conforme os saquinhos caem, os pontos sobem na tela com sons de fliperama:
-   * **Buraco:** `+3 pontos`
-   * **Prancha:** `+1 ponto`
+   * **Buraco Pequeno (`pontosPequeno`):** `+8 pontos`
+   * **Buraco Médio (`pontosMedio`):** `+6 pontos`
+   * **Buraco Grande (`pontosGrande`):** `+4 pontos`
    * **Fora:** `0 pontos`
 4. **Finalização Automática:** Ao registrar o **5º arremesso**, o cronômetro **trava imediatamente no exato milissegundo** do último impacto, os dados são persistidos no PostgreSQL e o Ranking Global é atualizado com a fanfarra de vitória!
    * Não é necessário apertar nenhum botão para encerrar a jogada;
@@ -42,11 +43,11 @@ O arquivo `arduino/main.ino` é responsável por monitorar os sensores físicos 
 
 ### 1. Sensores e Mapeamento de Pinos
 
-| Alvo / Buraco | Sensor Utilizado | Pinos no Arduino | Limiar de Detecção | Pontuação |
-| :--- | :--- | :--- | :--- | :---: |
-| **Buraco Pequeno** | Laser ToF `VL53L0X` | Barramento `I2C` (`SDA` / `SCL`) | `< 100 mm` (`LIMIAR_LASER_MM`) | `50 pts` |
-| **Buraco Médio** | Ultrassônico `HC-SR04` | `TRIGGER`: Pino `5` / `ECHO`: Pino `6` | `< 15 cm` (`LIMIAR_SONAR_CM`) | `30 pts` |
-| **Buraco Grande** | Célula de Carga `HX711` | `DOUT`: Pino `3` / `SCK`: Pino `2` | `> 100.0 g` (`LIMIAR_PESO_G`) | `10 pts` |
+| Alvo / Buraco | Sensor Utilizado | Pinos no Arduino | Limiar de Detecção | Constante (`main.ino`) | Pontuação |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| **Buraco Pequeno** | Laser ToF `VL53L0X` | Barramento `I2C` (`SDA` / `SCL`) | `< 100 mm` (`LIMIAR_LASER_MM`) | `pontosPequeno` | `8 pts` |
+| **Buraco Médio** | Ultrassônico `HC-SR04` | `TRIGGER`: Pino `5` / `ECHO`: Pino `6` | `< 15 cm` (`LIMIAR_SONAR_CM`) | `pontosMedio` | `6 pts` |
+| **Buraco Grande** | Célula de Carga `HX711` | `DOUT`: Pino `3` / `SCK`: Pino `2` | `> 100.0 g` (`LIMIAR_PESO_G`) | `pontosGrande` | `4 pts` |
 
 * **Bibliotecas necessárias na Arduino IDE:** `Wire.h`, `Adafruit_VL53L0X`, `NewPing`, `HX711` e `ArduinoJson` (v7).
 
