@@ -38,4 +38,8 @@ sleep 0.4
 
 # 4. Executa o servidor Python central (mantém o terminal aberto exibindo logs)
 echo "==> Iniciando Servidor Web e WebSocket..."
-exec python3 "$DIR/backend/server.py"
+if [ -f "$DIR/venv/bin/python3" ]; then
+    exec "$DIR/venv/bin/python3" "$DIR/backend/server.py"
+else
+    exec python3 "$DIR/backend/server.py"
+fi
