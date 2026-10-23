@@ -83,13 +83,39 @@ game_manager = GameManager(on_event=broadcast_evento_threadsafe)
 def tratar_mensagem_serial(mensagem: str) -> None:
     """
     Roteador de Mensagens do Arduino:
-    Chamado sempre que o Arduino envia um texto via USB.
-    Traduz a mensagem da placa física em uma ação dentro do jogo.
+    Chamado pelo SerialHandler sempre que o Arduino (main.ino) envia dados via USB.
+    Interpreta tanto o pacote JSON do main.ino (ex: {"evento":"acerto","buraco":"pequeno","pontos":8})
+    quanto comandos de texto direto (ex: "PEQUENO", "MEDIO", "GRANDE", "FORA", "START").
     """
-    msg = mensagem.strip().upper()
-    logging.info(f"[Serial Router] Processando: '{msg}'")
+    texto = mensagem.strip()
+    if not texto:
+        return
 
-    # Botão de largada / parada física (ou tecla espaço)
+    logging.info(f"[Serial Router] Processando: '{texto}'")
+
+    # 1. Pacote JSON vindo do main.ino: {"evento":"acerto","buraco":"pequeno","pontos":8}
+    if texto.startswith("{") and texto.endswith("}"):
+        try:
+            dados_arduino = json.loads(texto)
+            evento = str(dados_arduino.get("evento", "")).strip().lower()
+            buraco = str(dados_arduino.get("buraco", "")).strip().upper()
+            pontos_raw = dados_arduino.get("pontos")
+            pontos = int(pontos_raw) if pontos_raw is not None else None
+
+            if evento == "acerto" or buraco:
+                codigo_sensor = buraco or "PEQUENO"
+                res = game_manager.registrar_arremesso(codigo_sensor, pontos=pontos)
+                pts = res.get("pontos", pontos if pontos is not None else 0)
+                serial_handler.enviar_comando_arduino(f"ACERTO_{pts}")
+                if game_manager.estado == EstadosJogo.FINALIZADA:
+                    serial_handler.enviar_comando_arduino("GAME_OVER")
+                return
+        except Exception as e:
+            logging.warning(f"[Serial Router] Erro ao decodificar JSON do Arduino ('{texto}'): {e}")
+
+    msg = texto.upper().replace("MÉDIO", "MEDIO")
+
+    # 2. Botão de largada / parada física (ou tecla espaço)
     if msg in ("START", "ESPACO", "ESPAÇO", "BOTAO_START"):
         game_manager.acao_espaco()
         if game_manager.estado == EstadosJogo.JOGANDO:
@@ -97,8 +123,8 @@ def tratar_mensagem_serial(mensagem: str) -> None:
         elif game_manager.estado == EstadosJogo.FINALIZADA:
             serial_handler.enviar_comando_arduino("GAME_OVER")
 
-    # Sensores da prancha e buraco
-    elif msg in ("BURACO", "PRANCHA", "FORA"):
+    # 3. Sensores dos buracos (pequeno=8, medio=6, grande=4) ou equivalentes do simulador
+    elif msg in ("PEQUENO", "MEDIO", "GRANDE", "BURACO", "PRANCHA", "FORA"):
         res = game_manager.registrar_arremesso(msg)
         pts = res.get("pontos", 0)
         # Devolve sinal para o Arduino piscar luzes conforme a pontuação do saquinho
@@ -107,7 +133,7 @@ def tratar_mensagem_serial(mensagem: str) -> None:
         if game_manager.estado == EstadosJogo.FINALIZADA:
             serial_handler.enviar_comando_arduino("GAME_OVER")
 
-    # Comando de reset de emergência
+    # 4. Comando de reset de emergência
     elif msg in ("RESET", "CANCELAR"):
         game_manager.resetar_para_espera()
         serial_handler.enviar_comando_arduino("LEDS_OFF")
@@ -386,10 +412,19 @@ async def websocket_handler(websocket, path):
                         "jogadores_cadastrados": db.listar_jogadores()
                     }))
 
-                # 5. Arremesso simulado pelo teclado do PC ([B], [P], [F])
+                # 5. Arremesso simulado pelo teclado do PC ou botões na interface web
                 elif tipo == "SIMULAR_ARREMESSO":
-                    sensor = dados.get("sensor", "BURACO")
-                    tratar_mensagem_serial(sensor)
+                    sensor = str(dados.get("sensor", "PEQUENO")).strip()
+                    pontos = dados.get("pontos")
+                    if pontos is not None:
+                        pacote_json = json.dumps({
+                            "evento": "acerto",
+                            "buraco": sensor.lower(),
+                            "pontos": int(pontos)
+                        })
+                        serial_handler.simular_entrada(pacote_json)
+                    else:
+                        serial_handler.simular_entrada(sensor)
 
                 # 6. Cancelamento ou reset manual
                 elif tipo == "CANCELAR_PARTIDA":
@@ -557,7 +592,7 @@ async def main():
     logging.info("=" * 60)
     logging.info("🎮 CORNHOLE INTELIGENTE - IFEx")
     logging.info(f"🌐 Servidor Web & WebSocket rodando em: http://localhost:{porta}")
-    logging.info("🕹️ Modo Simulador ativo pelo teclado: [ESPAÇO], [B], [P], [F], [O]")
+    logging.info("🕹️ Modo Simulador ativo pelo teclado: [ESPAÇO], [1/B], [2/M], [3/G], [F], [O]")
     logging.info("=" * 60)
 
     async with server:
@@ -570,4 +605,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logging.info("Servidor encerrado pelo usuário.")
         serial_handler.parar()
-

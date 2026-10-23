@@ -29,6 +29,15 @@ PG_PORT = os.environ.get("PG_PORT", "5432")
 PG_USER = os.environ.get("PG_USER", "postgres")
 DB_NAME = os.environ.get("DB_NAME", "ifex_cornhole")
 
+PONTOS_PADRAO_SENSORES = {
+    "PEQUENO": 8,
+    "MEDIO": 6,
+    "GRANDE": 4,
+    "PRANCHA": 0,
+    "FORA": -4,
+    "BURACO": 8,
+}
+
 
 def _execute_sql(sql: str, params: Optional[List[Any]] = None) -> None:
     """
@@ -136,8 +145,9 @@ def listar_jogadores() -> List[Dict[str, Any]]:
 def listar_sensores() -> List[Dict[str, Any]]:
     """
     Retorna os sensores ativos cadastrados no banco e seus valores de pontuação:
-    - BURACO: 3 pontos
-    - PRANCHA: 1 ponto
+    - PEQUENO: 8 pontos
+    - MEDIO: 6 pontos
+    - GRANDE: 4 pontos
     - FORA: 0 pontos
     """
     return _query_json("SELECT codigo, pontos, descricao, ativo FROM sensores WHERE ativo = TRUE;")
@@ -164,20 +174,36 @@ def registrar_arremesso(
     partida_id: int, 
     numero_saquinho: int, 
     sensor_codigo: str, 
-    tempo_parcial_ms: Optional[int] = None
+    tempo_parcial_ms: Optional[int] = None,
+    pontos: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Registra um dos 5 arremessos de uma rodada na tabela 'arremessos'.
     
-    Atenção para a automação do PostgreSQL:
-    Nós NÃO precisamos somar os pontos aqui no Python!
-    A trigger 'trg_arremesso_before_insert' no PostgreSQL busca o valor do sensor
-    e a trigger 'trg_arremesso_after_change' atualiza a soma na tabela 'partidas' na mesma hora.
+    Se 'pontos' for enviado pelo Arduino (main.ino), grava exatamente esse valor
+    e garante que o sensor esteja cadastrado na tabela 'sensores'.
+    A trigger 'trg_atualiza_pontuacao' no PostgreSQL recalcula a soma na tabela 'partidas'.
     """
+    codigo_limpo = sensor_codigo.strip().upper().replace("'", "''")
+    pontos_padrao = PONTOS_PADRAO_SENSORES.get(codigo_limpo, 0)
+    pontos_efetivos = int(pontos) if pontos is not None else pontos_padrao
+
+    # Garante que restrições antigas de pontos >= 0 sejam removidas (para aceitar FORA = -4)
+    # e que o sensor esteja cadastrado na tabela 'sensores' com a pontuação correspondente
+    _execute_sql(f"""
+        ALTER TABLE sensores DROP CONSTRAINT IF EXISTS sensores_pontos_check;
+        ALTER TABLE partidas DROP CONSTRAINT IF EXISTS partidas_pontuacao_total_check;
+        ALTER TABLE arremessos DROP CONSTRAINT IF EXISTS arremessos_pontos_check;
+        INSERT INTO sensores (codigo, pontos, descricao, ativo)
+        VALUES ('{codigo_limpo}', {pontos_efetivos}, 'Sensor {codigo_limpo}', TRUE)
+        ON CONFLICT (codigo) DO UPDATE SET pontos = EXCLUDED.pontos;
+    """)
+
     tempo_val = tempo_parcial_ms if tempo_parcial_ms is not None else "NULL"
+    pontos_val = int(pontos) if pontos is not None else "NULL"
     sql = f"""
-        INSERT INTO arremessos (partida_id, numero_saquinho, sensor_codigo, tempo_parcial_ms)
-        VALUES ({partida_id}, {numero_saquinho}, '{sensor_codigo}', {tempo_val})
+        INSERT INTO arremessos (partida_id, numero_saquinho, sensor_codigo, pontos, tempo_parcial_ms)
+        VALUES ({partida_id}, {numero_saquinho}, '{codigo_limpo}', {pontos_val}, {tempo_val})
         RETURNING id, partida_id, numero_saquinho, sensor_codigo, pontos, tempo_parcial_ms, registrado_em;
     """
     res = _query_json(sql)
@@ -566,5 +592,3 @@ if __name__ == "__main__":
         arquivo = sys.argv[2]
         qtd = importar_partidas_csv(arquivo)
         print(f"✅ {qtd} partidas importadas com sucesso de '{arquivo}'!")
-
-

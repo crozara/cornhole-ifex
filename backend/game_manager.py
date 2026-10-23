@@ -13,10 +13,11 @@ Este arquivo é o "CÉREBRO" do jogo. Ele controla:
 =============================================================================
 """
 
+import logging
+import os
+import sys
 import time
 from typing import Any, Callable, Dict, List, Optional
-import sys
-import os
 
 # Garante que o Python consiga encontrar a pasta do banco de dados na raiz do projeto
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,15 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from database import db
+
+PONTOS_PADRAO_SENSORES = {
+    "PEQUENO": 8,
+    "MEDIO": 6,
+    "GRANDE": 4,
+    "PRANCHA": 0,
+    "FORA": -4,
+    "BURACO": 8,
+}
 
 
 class EstadosJogo:
@@ -186,10 +196,11 @@ class GameManager:
         self._notificar(evento)
         return evento
 
-    def registrar_arremesso(self, sensor_codigo: str) -> Dict[str, Any]:
+    def registrar_arremesso(self, sensor_codigo: str, pontos: Optional[int] = None) -> Dict[str, Any]:
         """
-        Chamado toda vez que um saquinho cai na prancha, no buraco ou fora.
-        Salva no banco (tabela 'arremessos') e as triggers calculam os pontos.
+        Chamado toda vez que um saquinho cai em um dos buracos (pequeno, medio, grande) ou fora.
+        Recebe o código do buraco/sensor e a pontuação enviada pelo main.ino via SerialHandler,
+        persiste no PostgreSQL e notifica a interface web em tempo real.
         """
         # Só aceita arremessos se a partida estiver rodando
         if self.estado != EstadosJogo.JOGANDO or self.partida_id is None:
@@ -202,23 +213,26 @@ class GameManager:
         # Calcula quantos milissegundos se passaram desde o início até este arremesso
         tempo_parcial_ms = int((time.perf_counter() - self.inicio_timestamp) * 1000)
 
-        # Padroniza o texto do sensor em maiúsculas (ex: "BURACO", "PRANCHA", "FORA")
-        codigo = sensor_codigo.strip().upper()
+        # Padroniza o texto do sensor em maiúsculas (ex: "PEQUENO", "MEDIO", "GRANDE", "FORA")
+        codigo = sensor_codigo.strip().upper().replace("MÉDIO", "MEDIO")
+        pontos_informados = int(pontos) if pontos is not None else PONTOS_PADRAO_SENSORES.get(codigo, 0)
 
-        # Salva no PostgreSQL: a trigger do banco busca o valor do sensor e soma na partida
+        # Salva no PostgreSQL com os pontos enviados pelo main.ino
         arremesso_db = db.registrar_arremesso(
             partida_id=self.partida_id,
             numero_saquinho=num_saquinho,
             sensor_codigo=codigo,
-            tempo_parcial_ms=tempo_parcial_ms
+            tempo_parcial_ms=tempo_parcial_ms,
+            pontos=pontos_informados
         )
 
         # Atualiza as variáveis em memória
-        pontos_saquinho = arremesso_db.get("pontos", 0)
+        pontos_saquinho = int(arremesso_db.get("pontos", pontos_informados))
         self.pontuacao_atual += pontos_saquinho
         info_saquinho = {
             "numero": num_saquinho,
             "sensor": codigo,
+            "buraco": codigo.lower(),
             "pontos": pontos_saquinho,
             "tempo_parcial_ms": tempo_parcial_ms
         }
@@ -230,6 +244,7 @@ class GameManager:
             "partida_id": self.partida_id,
             "numero_saquinho": num_saquinho,
             "sensor": codigo,
+            "buraco": codigo.lower(),
             "pontos": pontos_saquinho,
             "pontuacao_total": self.pontuacao_atual,
             "tempo_parcial_ms": tempo_parcial_ms,

@@ -25,14 +25,43 @@ O projeto integra **hardware**, **comunicação serial**, **banco de dados relac
 
 1. **Cadastro do Jogador:** O operador pressiona a tecla **`[O]`** e cadastra o competidor (nome e turma).
 2. **Início da Rodada:** O jogador se posiciona e aperta a barra de **`[ESPAÇO]`**. O cronômetro gigante dispara e os LEDs acendem.
-3. **Durante os Arremessos:** Conforme os saquinhos caem, os pontos sobem na tela com sons de fliperama:
-   * **Buraco:** `+3 pontos`
-   * **Prancha:** `+1 ponto`
-   * **Fora:** `0 pontos`
+3. **Durante os Arremessos:** Conforme os saquinhos caem, os pontos sobem na tela com sons de fliperama (5 casos possíveis):
+   * **1. Buraco Pequeno (`pontosPequeno`):** `+8 pontos`
+   * **2. Buraco Médio (`pontosMedio`):** `+6 pontos`
+   * **3. Buraco Grande (`pontosGrande`):** `+4 pontos`
+   * **4. Prancha (`PONTOS_PRANCHA`):** `0 ponto`
+   * **5. Fora (`PONTOS_FORA`):** `-4 pontos`
 4. **Finalização Automática:** Ao registrar o **5º arremesso**, o cronômetro **trava imediatamente no exato milissegundo** do último impacto, os dados são persistidos no PostgreSQL e o Ranking Global é atualizado com a fanfarra de vitória!
    * Não é necessário apertar nenhum botão para encerrar a jogada;
    * O competidor pressiona **`[ESPAÇO]`** na tela de vitória apenas para limpar o placar para o próximo jogador;
    * Caso o competidor queira desistir ou encerrar antes dos 5 arremessos, a tecla **`[ESPAÇO]`** ainda funciona como parada manual antecipada.
+
+---
+
+## 🤖 Hardware e Firmware (Arduino)
+
+O arquivo `arduino/main.ino` é responsável por monitorar os sensores físicos da prancha em tempo real e enviar os eventos de pontuação para o computador via porta Serial USB (`115200 bps`).
+
+### 1. Sensores e Mapeamento de Pinos
+
+| Alvo / Buraco | Sensor Utilizado | Pinos no Arduino | Limiar de Detecção | Constante (`main.ino`) | Pontuação |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| **Buraco Pequeno** | Laser ToF `VL53L0X` | Barramento `I2C` (`SDA` / `SCL`) | `< 100 mm` (`LIMIAR_LASER_MM`) | `pontosPequeno` | `8 pts` |
+| **Buraco Médio** | Ultrassônico `HC-SR04` | `TRIGGER`: Pino `5` / `ECHO`: Pino `6` | `< 15 cm` (`LIMIAR_SONAR_CM`) | `pontosMedio` | `6 pts` |
+| **Buraco Grande** | Célula de Carga `HX711` | `DOUT`: Pino `3` / `SCK`: Pino `2` | `> 100.0 g` (`LIMIAR_PESO_G`) | `pontosGrande` | `4 pts` |
+
+* **Bibliotecas necessárias na Arduino IDE:** `Wire.h`, `Adafruit_VL53L0X`, `NewPing`, `HX711` e `ArduinoJson` (v7).
+
+### 2. Controle de Status e Tempo de Retirada (`tempoDeEspera`)
+
+Como no Cornhole o saquinho pode permanecer sobre o sensor ou exigir que o jogador coloque a mão para retirá-lo, o firmware implementa uma máquina de estados com um tempo de retirada configurável (`tempoDeEspera = 3.0` segundos):
+
+* **`LIVRE`:** Estado inicial em que nenhum sensor detecta objetos e o tempo de espera já expirou. Assim que qualquer sensor detecta um saquinho, o ponto correspondente é computado **uma única vez**, enviado via Serial em JSON (`{"evento":"acerto","buraco":"...","pontos":...}`) e o status muda imediatamente para **`DETECTADO`**.
+* **`DETECTADO`:** Enquanto o saquinho (ou a mão do jogador) permanecer na área de leitura de qualquer sensor, o sistema mantém o status **`DETECTADO`** e bloqueia novas pontuações.
+* **`ESPERANDO`:** No exato momento em que o objeto é retirado (todos os sensores livres), o sistema entra no status **`ESPERANDO`** e inicia a contagem regressiva de `tempoDeEspera` segundos (`3.0s`).
+  * Durante **`ESPERANDO`**, **nenhum ponto é computado**.
+  * Caso qualquer objeto seja detectado novamente enquanto estiver em **`ESPERANDO`** (por exemplo, o jogador esbarrando no sensor ao puxar o saquinho), **nenhum ponto é marcado**, o status retorna para **`DETECTADO`** e, quando o objeto for retirado outra vez, o tempo de espera é **reiniciado em 100%** (terá que aguardar os `3.0` segundos completos novamente).
+  * Após transcorrerem os `tempoDeEspera` segundos ininterruptos sem detecções, o sistema retorna ao status **`LIVRE`** para o próximo lançamento.
 
 ---
 
@@ -106,9 +135,11 @@ Quando terminar o evento ou os testes, execute:
 | **`[ESPAÇO]`** | Durante a rodada | Parada manual antecipada (caso não vá arremessar os 5 saquinhos) |
 | **`[ESPAÇO]`** | Na tela de resultado | **Limpa a tela** e prepara para o próximo competidor da fila |
 | **`[O]`** | A qualquer momento | **Abre o Painel do Operador** para cadastrar ou escolher jogadores |
-| **`[B]`** | A qualquer momento | *(Simulador)* Acerto no **Buraco (+3 pts)** |
-| **`[P]`** | A qualquer momento | *(Simulador)* Acerto na **Prancha (+1 pt)** |
-| **`[F]`** | A qualquer momento | *(Simulador)* Saquinho **Fora (0 pts)** |
+| **`[1]`** | Durante a rodada | *(Simulador)* Caso 1: **Buraco Pequeno (+8 pts)** |
+| **`[2]`** | Durante a rodada | *(Simulador)* Caso 2: **Buraco Médio (+6 pts)** |
+| **`[3]`** | Durante a rodada | *(Simulador)* Caso 3: **Buraco Grande (+4 pts)** |
+| **`[P]`** | Durante a rodada | *(Simulador)* Caso 4: **Prancha (0 pt)** |
+| **`[F]`** | Durante a rodada | *(Simulador)* Caso 5: **Fora (-4 pts)** |
 | **`[R]`** | A qualquer momento | Reseta o display para a tela de espera |
 
 ---
@@ -137,6 +168,8 @@ Você não precisa abrir a web para auditar ou ver os resultados:
 
 ```text
 ifex/
+├── arduino/
+│   └── main.ino            # Firmware do Arduino (leitura de sensores e tempo de retirada)
 ├── backend/
 │   ├── game_manager.py     # Máquina de estados, cronômetro de precisão e pontuação
 │   ├── serial_handler.py   # Leitura serial do Arduino (USB) e modo simulador
@@ -161,9 +194,10 @@ ifex/
 
 ## 🛠️ Tecnologias Utilizadas
 
+* **Hardware & Firmware:** Arduino (C/C++), Sensores `VL53L0X` (Laser I2C), `HC-SR04` (Ultrassônico) e `HX711` (Célula de Carga)
 * **Linguagem Back-end:** Python 3.12
 * **Tempo Real:** WebSockets (protocolo `ws://`)
 * **Banco de Dados:** PostgreSQL 16
-* **Comunicação de Hardware:** PySerial / Porta Serial USB
+* **Comunicação de Hardware:** PySerial / Porta Serial USB (`115200 bps`)
 * **Front-end:** HTML5, CSS3 Moderno, JavaScript ES6+
 * **Áudio:** Web Audio API (Sintetizador 8-bit nativo)

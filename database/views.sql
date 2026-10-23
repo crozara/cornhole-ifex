@@ -18,7 +18,7 @@
 --   2. Critério 1: Maior pontuação total (DESC) - quem fez mais pontos fica na frente.
 --   3. Critério 2 (Desempate): Menor tempo em milissegundos (tempo_ms ASC).
 --   4. Formatação: Já converte milissegundos para o formato digital bonito (MM:SS.MS).
--- -----------------------------------------------------------------------------
+-- =============================================================================
 CREATE OR REPLACE VIEW view_ranking_global AS
 WITH melhor_partida_por_jogador AS (
     -- Etapa 1: Numera as partidas de cada jogador da melhor para a pior
@@ -67,8 +67,7 @@ ORDER BY posicao ASC;
 -- -----------------------------------------------------------------------------
 -- 2. VIEW DE HISTÓRICO COMPLETO (Auditoria e Relatório em Planilha)
 -- -----------------------------------------------------------------------------
--- Agrupa todas as partidas e calcula quantos saquinhos caíram no buraco,
--- quantos caíram na prancha e quantos foram fora.
+-- Agrupa todas as partidas e contabiliza os arremessos nos buracos, prancha e fora.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW view_historico_partidas AS
 SELECT 
@@ -83,7 +82,7 @@ SELECT
     p.finalizada_em,
     COUNT(a.id) AS total_saquinhos_computados,
     -- Contagem condicional por tipo de acerto usando o recurso FILTER do PostgreSQL
-    COUNT(a.id) FILTER (WHERE a.sensor_codigo = 'BURACO') AS saquinhos_buraco,
+    COUNT(a.id) FILTER (WHERE a.sensor_codigo IN ('PEQUENO', 'MEDIO', 'GRANDE', 'BURACO')) AS saquinhos_buraco,
     COUNT(a.id) FILTER (WHERE a.sensor_codigo = 'PRANCHA') AS saquinhos_prancha,
     COUNT(a.id) FILTER (WHERE a.sensor_codigo = 'FORA') AS saquinhos_fora
 FROM partidas p
