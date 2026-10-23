@@ -690,19 +690,19 @@ function connectWebSocket() {
             // 10. Mensagens de Segurança e Backup
             else if (msg.tipo === "BACKUP_CONCLUIDO") {
                 showSecurityFeedback(msg.mensagem, msg.sucesso ? "var(--neon-green)" : "var(--neon-red)");
-                if (msg.sucesso) playSound("RECORD");
+                if (msg.sucesso && window.arcadeAudio) window.arcadeAudio.playStart();
             }
             else if (msg.tipo === "RESTAURACAO_CONCLUIDA") {
                 showSecurityFeedback(msg.mensagem, msg.sucesso ? "var(--neon-green)" : "var(--neon-red)");
-                if (msg.sucesso) playSound("CORNHOLIO");
+                if (msg.sucesso && window.arcadeAudio) window.arcadeAudio.playHighScore();
             }
             else if (msg.tipo === "BANCO_ZERADO") {
                 showSecurityFeedback(msg.mensagem, msg.sucesso ? "var(--neon-yellow)" : "var(--neon-red)");
-                if (msg.sucesso) playSound("RESET");
+                if (msg.sucesso && window.arcadeAudio) window.arcadeAudio.playGameOver();
             }
             else if (msg.tipo === "CSV_EXPORTADO") {
                 showSecurityFeedback(msg.mensagem, msg.sucesso ? "var(--neon-green)" : "var(--neon-red)");
-                if (msg.sucesso) playSound("RECORD");
+                if (msg.sucesso && window.arcadeAudio) window.arcadeAudio.playStart();
             }
         } catch (e) {
             console.error("Erro ao tratar mensagem WebSocket:", e);
@@ -996,6 +996,4 @@ window.addEventListener('DOMContentLoaded', () => {
         .then(r => r.json())
         .then(data => populateGroupFilter(data))
         .catch(() => {});
-});
-
 });
