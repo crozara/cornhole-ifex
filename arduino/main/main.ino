@@ -5,7 +5,10 @@
 
 // --- Configurações dos Pinos ---
 
-// Buraco Pequeno (Sensor Laser VL53L0X via I2C: SDA/SCL)
+// Buraco Pequeno:
+// Suporta TANTO o Sensor Laser VL53L0X (I2C: SDA / SCL)
+// QUANTO o Sensor Infravermelho Digital de Obstáculo comum (Pino Digital 4)
+#define PINO_INFRA_DIGITAL 4 // Conecte o pino OUT do sensor infravermelho no Pino 4 (opcional)
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 bool laserDisponivel = false;
 
@@ -50,7 +53,11 @@ void enviarParaPython(const char* nomeBuraco, int pontos) {
 
 void setup() {
   Serial.begin(115200);
-  delay(100);
+  // Aguarda conexão Serial por até 3 segundos (não bloqueia em placas com USB nativo)
+  while (!Serial && millis() < 3000) { delay(10); }
+
+  // Configura pino do sensor infravermelho digital (com pull-up interno)
+  pinMode(PINO_INFRA_DIGITAL, INPUT_PULLUP);
 
   // 1. Inicialização segura do VL53L0X (não trava sem o sensor)
   Wire.begin();
@@ -73,19 +80,31 @@ void setup() {
   } else {
     Serial.println("{\"status\":\"aviso\",\"sensor\":\"HX711_NAO_ENCONTRADO\"}");
   }
+
+  Serial.println("{\"evento\":\"boot\",\"status\":\"ARDUINO_ONLINE\",\"versao\":\"2026.1\"}");
 }
 
 void loop() {
   unsigned long agora = millis();
 
   // -------------------------------------------------------------
-  // 1. BURACO PEQUENO (Laser VL53L0X)
+  // 1. BURACO PEQUENO (Laser VL53L0X ou Infravermelho Digital Pino 4)
   // -------------------------------------------------------------
-  if (laserDisponivel && (agora - ultimoAcertoPequeno > COOLDOWN_MS)) {
-    VL53L0X_RangingMeasurementData_t measure;
-    lox.rangingTest(&measure, false);
-    // RangeStatus == 0 garante leitura válida e estável
-    if (measure.RangeStatus == 0 && measure.RangeMilliMeter > 10 && measure.RangeMilliMeter < LIMIAR_LASER_MM) {
+  if (agora - ultimoAcertoPequeno > COOLDOWN_MS) {
+    bool detectouLaser = false;
+    if (laserDisponivel) {
+      VL53L0X_RangingMeasurementData_t measure;
+      lox.rangingTest(&measure, false);
+      // RangeStatus == 0 garante leitura válida e estável
+      if (measure.RangeStatus == 0 && measure.RangeMilliMeter > 10 && measure.RangeMilliMeter < LIMIAR_LASER_MM) {
+        detectouLaser = true;
+      }
+    }
+
+    // Sensor infravermelho de obstáculo digital (Pino 4: normalmente LOW ao detectar reflexo/objeto)
+    bool detectouInfra = (digitalRead(PINO_INFRA_DIGITAL) == LOW);
+
+    if (detectouLaser || detectouInfra) {
       ultimoAcertoPequeno = agora;
       enviarParaPython("pequeno", PONTOS_PEQUENO);
     }
