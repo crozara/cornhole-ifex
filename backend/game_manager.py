@@ -211,9 +211,25 @@ class GameManager:
         Recebe o código do buraco/sensor e a pontuação enviada pelo main.ino via SerialHandler,
         persiste no PostgreSQL e notifica a interface web em tempo real.
         """
-        # Só aceita arremessos se a partida estiver rodando
+        # Padroniza o texto do sensor em maiúsculas (ex: "PEQUENO", "MEDIO", "GRANDE", "FORA")
+        codigo = sensor_codigo.strip().upper().replace("MÉDIO", "MEDIO")
+        chave_sensor = "PEQUENO" if codigo == "BURACO" else codigo
+
+        # Atualiza a telemetria do sensor imediatamente (inclusive para bancada/testes fora de rodada)
+        if chave_sensor in self.stats_sensores:
+            self.stats_sensores[chave_sensor]["total"] += 1
+            self.stats_sensores[chave_sensor]["ultimo_ts"] = time.time()
+
+        # Só pontua no placar oficial se a partida estiver rodando
         if self.estado != EstadosJogo.JOGANDO or self.partida_id is None:
-            return {"aviso": "Jogo não está em andamento. Acerto ignorado."}
+            logging.info(f"[GameManager] Sensor '{codigo}' acionado, mas partida em '{self.estado}'. Acerto registrado no HUD.")
+            self._notificar({
+                "tipo": "AVISO_SENSOR_FORA_DE_RODADA",
+                "sensor": codigo,
+                "estado": self.estado,
+                "mensagem": f"Sensor {codigo} detectou! Inicie a rodada com [ESPAÇO] para pontuar."
+            })
+            return {"aviso": "Jogo não está em andamento. Acerto ignorado.", "sensor": codigo}
 
         num_saquinho = len(self.saquinhos) + 1
         if num_saquinho > 5:
@@ -221,9 +237,6 @@ class GameManager:
 
         # Calcula quantos milissegundos se passaram desde o início até este arremesso
         tempo_parcial_ms = int((time.perf_counter() - self.inicio_timestamp) * 1000)
-
-        # Padroniza o texto do sensor em maiúsculas (ex: "PEQUENO", "MEDIO", "GRANDE", "FORA")
-        codigo = sensor_codigo.strip().upper().replace("MÉDIO", "MEDIO")
         pontos_informados = int(pontos) if pontos is not None else PONTOS_PADRAO_SENSORES.get(codigo, 0)
 
         # Salva no PostgreSQL com os pontos enviados pelo main.ino
@@ -238,12 +251,6 @@ class GameManager:
         # Atualiza as variáveis em memória
         pontos_saquinho = int(arremesso_db.get("pontos", pontos_informados))
         self.pontuacao_atual += pontos_saquinho
-
-        # Atualiza a telemetria do sensor
-        chave_sensor = "PEQUENO" if codigo == "BURACO" else codigo
-        if chave_sensor in self.stats_sensores:
-            self.stats_sensores[chave_sensor]["total"] += 1
-            self.stats_sensores[chave_sensor]["ultimo_ts"] = time.time()
 
         info_saquinho = {
             "numero": num_saquinho,

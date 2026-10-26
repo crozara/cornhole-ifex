@@ -61,6 +61,7 @@ class SerialHandler:
         self.ultimo_ts: Optional[float] = None
         self.total_leituras: int = 0
         self.historico_telemetria: list = []
+        self.ultimo_erro: Optional[str] = None
 
     def encontrar_porta_arduino(self) -> Optional[str]:
         """
@@ -141,6 +142,7 @@ class SerialHandler:
                 self.conexao = serial.Serial(porta, self.baudrate, timeout=1)
                 self.porta_ativa = porta
                 self.modo_simulador = False
+                self.ultimo_erro = None
                 logging.info(f"[Serial] ✅ Conectado com sucesso em {porta}!")
 
                 # Limpa qualquer dado velho que tenha ficado acumulado na memória da porta
@@ -169,7 +171,12 @@ class SerialHandler:
                         self.callback_mensagem(linha)
 
             except Exception as e:
-                # Se der algum erro (ex: alguém puxou o cabo USB), volta para o modo simulador
+                # Se der algum erro (ex: permissão negada, cabo desconectado), registra e tenta novamente
+                err_msg = str(e)
+                if "Permission denied" in err_msg:
+                    self.ultimo_erro = f"Permissão negada em {porta}. Execute: sudo usermod -a -G dialout $USER"
+                else:
+                    self.ultimo_erro = err_msg
                 logging.warning(f"[Serial] Erro na conexão ({e}). Tentando reconectar em 2s...")
                 self.modo_simulador = True
                 if self.conexao:
@@ -222,6 +229,7 @@ class SerialHandler:
             "conectado": not self.modo_simulador and self.conexao is not None and getattr(self.conexao, "is_open", False),
             "porta": self.porta_ativa if not self.modo_simulador else "Simulador Teclado",
             "modo_simulador": self.modo_simulador,
+            "ultimo_erro": self.ultimo_erro,
             "baudrate": self.baudrate,
             "total_leituras": self.total_leituras,
             "ultima_linha": self.ultima_linha,

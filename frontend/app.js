@@ -510,9 +510,15 @@ function updateTelemetryUI(telemetria) {
     if (telemetria.serial) {
         const s = telemetria.serial;
         if (dom.diagSerialPort) {
-            dom.diagSerialPort.textContent = s.modo_simulador 
-                ? "🕹️ MODO SIMULADOR" 
-                : (s.conectado ? `🔌 ${s.porta} (${s.baudrate} bps)` : `⚠️ ${s.porta} (Desconectado)`);
+            if (s.ultimo_erro) {
+                dom.diagSerialPort.textContent = `⚠️ ${s.ultimo_erro}`;
+                dom.diagSerialPort.title = s.ultimo_erro;
+            } else {
+                dom.diagSerialPort.textContent = s.modo_simulador 
+                    ? "🕹️ MODO SIMULADOR" 
+                    : (s.conectado ? `🔌 ${s.porta} (${s.baudrate} bps)` : `⚠️ ${s.porta} (Desconectado)`);
+                dom.diagSerialPort.title = "";
+            }
         }
         if (dom.diagSerialDot) {
             dom.diagSerialDot.className = "status-pulse-dot " + (s.conectado ? "online" : (s.modo_simulador ? "sim" : "offline"));
@@ -868,6 +874,13 @@ function connectWebSocket() {
             // 11. Telemetria e Diagnóstico dos Sensores em Tempo Real
             else if (msg.tipo === "TELEMETRIA_ATUALIZADA") {
                 updateTelemetryUI(msg);
+            }
+            // 12. Aviso quando o sensor físico dispara fora de partida
+            else if (msg.tipo === "AVISO_SENSOR_FORA_DE_RODADA") {
+                if (currentState !== "JOGANDO") {
+                    triggerScorePopup(`🎯 SENSOR ${msg.sensor}! (APERTE ESPAÇO)`, "#00f0ff");
+                    if (window.arcadeAudio) window.arcadeAudio.playBoard();
+                }
             }
         } catch (e) {
             console.error("Erro ao tratar mensagem WebSocket:", e);

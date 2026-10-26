@@ -6,8 +6,12 @@
 
 // --- Configurações dos Pinos ---
 
-// Buraco Pequeno (Sensor Laser VL53L0X usa I2C: pinos SDA e SCL)
+// Buraco Pequeno:
+// Suporta TANTO o Sensor Laser VL53L0X (I2C: SDA / SCL)
+// QUANTO o Sensor Infravermelho Digital de Obstáculo comum (Pino Digital 4)
+#define PINO_INFRA_DIGITAL 4 // Conecte o pino OUT do sensor infravermelho no Pino 4 (opcional)
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+bool loxAtivo = false;
 
 // Buraco Médio (Sensor Ultrassônico HC-SR04)
 #define TRIGGER_PIN  5
@@ -33,27 +37,37 @@ const int pontosGrande  = 4;
 
 // --- Variáveis de Controle (Debounce/Cooldown e Tempo de Retirada) ---
 // Evita que a mesma sacola registre vários pontos enquanto atravessa o buraco ou é retirada
-float tempoDeEspera = 3.0;          // Tempo de espera em segundos após retirar o objeto
+float tempoDeEspera = 2.0;          // Tempo de espera em segundos após retirar o objeto (otimizado para 2s)
 String status = "LIVRE";            // Estados do sistema: "LIVRE", "DETECTADO", "ESPERANDO"
 unsigned long inicioEspera = 0;     // Marca o momento (em ms) em que o objeto foi retirado
 float pesoAtual = 0.0;              // Mantém a última leitura válida da célula de carga
 
 void setup() {
-  // Baud rate alto para minimizar atraso na comunicação serial
+  // Baud rate alto para sincronização com Python
   Serial.begin(115200);
-  while (!Serial) { delay(1); }
+  while (!Serial && millis() < 3000) { delay(10); }
 
-  // 1. Inicializa Sensor Laser
-  if (!lox.begin()) {
-    // Em produção, você pode disparar um JSON de erro aqui
-    // Serial.println("{\"erro\": \"VL53L0X nao encontrado\"}");
+  // Configura pino do sensor infravermelho digital (com pull-up interno)
+  pinMode(PINO_INFRA_DIGITAL, INPUT_PULLUP);
+
+  // 1. Inicializa Sensor Laser VL53L0X (I2C)
+  loxAtivo = lox.begin();
+  if (!loxAtivo) {
+    Serial.println("{\"aviso\": \"VL53L0X nao encontrado no I2C (verifique se SDA=A4 e SCL=A5)\"}");
+  } else {
+    Serial.println("{\"info\": \"VL53L0X laser inicializado com sucesso\"}");
   }
 
-  // 2. Inicializa Célula de Carga
+  // 2. Inicializa Célula de Carga HX711 (protegido para NÃO travar se a célula não estiver conectada)
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  // IMPORTANTE: Insira seu fator de calibração obtido previamente
-  // scale.set_scale(2280.f); 
-  scale.tare(); // Zera a balança na inicialização
+  if (scale.is_ready() || scale.wait_ready_timeout(500)) {
+    scale.tare(); // Zera a balança na inicialização
+    Serial.println("{\"info\": \"HX711 tarado com sucesso\"}");
+  } else {
+    Serial.println("{\"info\": \"HX711 nao conectado no momento (ignorado para nao travar)\"}");
+  }
+
+  Serial.println("{\"evento\":\"boot\",\"status\":\"ARDUINO_ONLINE\",\"versao\":\"2026.1\"}");
 }
 
 void loop() {
@@ -63,11 +77,20 @@ void loop() {
   String buraco = "";
   int pontuacao = 0;
 
-  // --- LEITURA BURACO PEQUENO (VL53L0X) ---
-  VL53L0X_RangingMeasurementData_t measure;
-  lox.rangingTest(&measure, false);
-  // Se o status for diferente de 4 (Out of Range) e a distância cruzar o limiar
-  bool detectouPequeno = (measure.RangeStatus != 4 && measure.RangeMilliMeter < LIMIAR_LASER_MM);
+  // --- LEITURA BURACO PEQUENO (VL53L0X Laser ToF ou Infravermelho Digital) ---
+  bool detectouLaser = false;
+  if (loxAtivo) {
+    VL53L0X_RangingMeasurementData_t measure;
+    lox.rangingTest(&measure, false);
+    if (measure.RangeStatus != 4 && measure.RangeMilliMeter > 0 && measure.RangeMilliMeter < LIMIAR_LASER_MM) {
+      detectouLaser = true;
+    }
+  }
+
+  // Sensor infravermelho de obstáculo digital (Pino 4: normalmente LOW ao detectar reflexo/objeto)
+  bool detectouInfraDigital = (digitalRead(PINO_INFRA_DIGITAL) == LOW);
+
+  bool detectouPequeno = detectouLaser || detectouInfraDigital;
 
   // --- LEITURA BURACO MÉDIO (Ultrassônico) ---
   int distanciaCm = sonar.ping_cm();
