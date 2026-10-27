@@ -24,23 +24,26 @@ NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 HX711 scale;
 bool balancaDisponivel = false;
 
-// --- Parâmetros de Detecção e Limiares ---
+// --- Calibração e Parâmetros de Detecção ---
+float fatorCalibracao       = 84.0;  // Fator de conversão para gramas
 const int LIMIAR_LASER_MM   = 100;   // Acerto se objeto cruzar a menos de 100mm (10cm)
 const int LIMIAR_SONAR_CM   = 15;    // Acerto se objeto cruzar a menos de 15cm
-const float LIMIAR_PESO_G   = 100.0; // Variação mínima de peso para registrar acerto (g)
+const float LIMIAR_PESO_G   = 45.0;  // Sensibilidade aumentada (dispara a partir de 45g)
 
 // --- Pontuações Oficiais IFEx 2026 ---
 const int PONTOS_PEQUENO = 8;
 const int PONTOS_MEDIO   = 6;
 const int PONTOS_GRANDE  = 4;
 
-// --- Cooldown Independente por Sensor (Debounce de 2.5s) ---
-const unsigned long COOLDOWN_MS = 2500;
+// --- Cooldown Independente por Sensor ---
+const unsigned long COOLDOWN_MS      = 1000; // 1s para laser e ultrassônico
+const unsigned long COOLDOWN_BALANCA = 1500; // 1.5s para estabilização da balança
 unsigned long ultimoAcertoPequeno = 0;
 unsigned long ultimoAcertoMedio   = 0;
 unsigned long ultimoAcertoGrande  = 0;
 
 float ultimoPesoBase = 0.0;
+int leiturasPesoConsecutivas = 0; // Confirmação contra batidas/vibração na mesa
 
 void enviarParaPython(const char* nomeBuraco, int pontos) {
   // Envia JSON formatado diretamente pela Serial com quebra de linha (\n)
@@ -68,14 +71,13 @@ void setup() {
     Serial.println("{\"status\":\"aviso\",\"sensor\":\"VL53L0X_NAO_ENCONTRADO\"}");
   }
 
-  // 2. Inicialização segura do HX711 com timeout de 1 segundo (evita travamento do boot)
+  // 2. Inicialização e Calibração da Célula de Carga HX711
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   if (scale.wait_ready_timeout(1000)) {
     balancaDisponivel = true;
-    // Ajuste o fator de calibração da sua balança:
-    // scale.set_scale(2280.f);
-    scale.tare();
-    ultimoPesoBase = scale.get_units(1);
+    scale.set_scale(fatorCalibracao); // Converte leitura bruta para gramas
+    scale.tare(10);                   // Zera a balança na inicialização
+    ultimoPesoBase = 0.0;
     Serial.println("{\"status\":\"info\",\"sensor\":\"HX711_OK\"}");
   } else {
     Serial.println("{\"status\":\"aviso\",\"sensor\":\"HX711_NAO_ENCONTRADO\"}");
@@ -95,13 +97,11 @@ void loop() {
     if (laserDisponivel) {
       VL53L0X_RangingMeasurementData_t measure;
       lox.rangingTest(&measure, false);
-      // RangeStatus == 0 garante leitura válida e estável
       if (measure.RangeStatus == 0 && measure.RangeMilliMeter > 10 && measure.RangeMilliMeter < LIMIAR_LASER_MM) {
         detectouLaser = true;
       }
     }
 
-    // Sensor infravermelho de obstáculo digital (Pino 4: normalmente LOW ao detectar reflexo/objeto)
     bool detectouInfra = (digitalRead(PINO_INFRA_DIGITAL) == LOW);
 
     if (detectouLaser || detectouInfra) {
@@ -111,31 +111,44 @@ void loop() {
   }
 
   // -------------------------------------------------------------
-  // 2. BURACO MÉDIO (Ultrassônico HC-SR04)
+  // 2. BURACO MÉDIO (Célula de Carga HX711 - Leitura Não-Bloqueante)
+  // -------------------------------------------------------------
+  if (balancaDisponivel && scale.is_ready()) {
+    // IMPORTANTE: get_units(1) NÃO bloqueia o loop (leva < 1ms),
+    // permitindo que o sensor ultrassônico continue lendo sem atraso!
+    // fabs() garante funcionamento mesmo se a célula estiver montada invertida.
+    float pesoGramas = fabs(scale.get_units(1));
+
+    if (agora - ultimoAcertoGrande > COOLDOWN_BALANCA) {
+      float diferencaGramas = pesoGramas - ultimoPesoBase;
+
+      // Exige 2 amostras consecutivas (>= 100g) para ignorar vibrações/batidas na mesa
+      if (diferencaGramas >= LIMIAR_PESO_G) {
+        leiturasPesoConsecutivas++;
+        if (leiturasPesoConsecutivas >= 2) {
+          ultimoAcertoGrande = agora;
+          ultimoPesoBase = pesoGramas; // Atualiza a base para suportar sacos acumulados
+          leiturasPesoConsecutivas = 0;
+          enviarParaPython("medio", PONTOS_MEDIO);
+        }
+      } else {
+        leiturasPesoConsecutivas = 0;
+        // Se os saquinhos forem retirados da balança, reajusta a base
+        if (diferencaGramas < -25.0) {
+          ultimoPesoBase = pesoGramas;
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // 3. BURACO GRANDE (Sensor Ultrassônico HC-SR04)
   // -------------------------------------------------------------
   if (agora - ultimoAcertoMedio > COOLDOWN_MS) {
     int distanciaCm = sonar.ping_cm();
     if (distanciaCm > 0 && distanciaCm < LIMIAR_SONAR_CM) {
       ultimoAcertoMedio = agora;
-      enviarParaPython("medio", PONTOS_MEDIO);
-    }
-  }
-
-  // -------------------------------------------------------------
-  // 3. BURACO GRANDE (Célula de Carga HX711)
-  // -------------------------------------------------------------
-  if (balancaDisponivel && (agora - ultimoAcertoGrande > COOLDOWN_MS)) {
-    if (scale.is_ready()) {
-      float pesoLeitura = scale.get_units(1);
-      // Detecta aumento relativo de peso (suporta múltiplos sacos acumulados na rede)
-      if ((pesoLeitura - ultimoPesoBase) > LIMIAR_PESO_G) {
-        ultimoAcertoGrande = agora;
-        ultimoPesoBase = pesoLeitura; // Atualiza a base para o próximo arremesso
-        enviarParaPython("grande", PONTOS_GRANDE);
-      } else if (pesoLeitura < ultimoPesoBase - 50.0) {
-        // Se os sacos forem retirados do buraco, reseta a base
-        ultimoPesoBase = pesoLeitura;
-      }
+      enviarParaPython("grande", PONTOS_GRANDE);
     }
   }
 
